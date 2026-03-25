@@ -44,7 +44,20 @@ const SCHEMA = `
     worker_id UUID REFERENCES workers(id) ON DELETE CASCADE,
     platform_id UUID REFERENCES platforms(id) ON DELETE CASCADE,
     credentials JSONB,
+    proxy_config JSONB, -- { host, port, username, password }
     PRIMARY KEY (worker_id, platform_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS kpis (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    worker_id UUID REFERENCES workers(id),
+    date DATE DEFAULT CURRENT_DATE,
+    earnings_usd NUMERIC(10,2) DEFAULT 0,
+    tasks_submitted INTEGER DEFAULT 0,
+    tasks_accepted INTEGER DEFAULT 0,
+    ai_accuracy_score NUMERIC(5,2) DEFAULT 0,
+    ban_risk_score INTEGER DEFAULT 0,
+    UNIQUE(worker_id, date)
   );
 `;
 

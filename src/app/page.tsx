@@ -10,6 +10,7 @@ import ExecutionLogs from "@/components/dashboard/ExecutionLogs";
 import SafetyStatus from "@/components/dashboard/SafetyStatus";
 import IntelligenceGrowth from "@/components/dashboard/IntelligenceGrowth";
 import EarningsTracker from "@/components/dashboard/EarningsTracker";
+import KPIPulse from "@/components/dashboard/KPIPulse";
 
 const container = {
   hidden: { opacity: 0 },
@@ -45,7 +46,7 @@ export default function DashboardPage() {
           className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 w-fit"
         >
           <Sparkles className="w-3 h-3 text-blue-400" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Fleet Autonomous Core</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Universal Core Active</span>
         </motion.div>
 
         <div className="flex items-end justify-between">
@@ -54,7 +55,7 @@ export default function DashboardPage() {
               Phinix Fleet Command
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl">
-              <span className="text-white font-bold">2 workers + 1 AI agent</span> operating across 4 platforms. Day {new Date().getDate()} cycle active.
+              <span className="text-white font-bold">2 workers + 1 AI agent</span> operating across <span className="text-white font-bold">ANY website</span>. Morning Routine active.
             </p>
           </div>
 
@@ -67,8 +68,8 @@ export default function DashboardPage() {
               <Activity className={`text-blue-500 w-5 h-5 group-hover:text-white ${isSyncing ? "animate-spin" : ""}`} />
             </div>
             <div className="text-left">
-              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Fleet Poller</p>
-              <p className="text-lg font-bold">{isSyncing ? "Syncing..." : "24/7 Active"}</p>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Universal Pulse</p>
+              <p className="text-lg font-bold">{isSyncing ? "Syncing..." : "24/7 Monitoring"}</p>
             </div>
           </button>
         </div>
@@ -77,10 +78,14 @@ export default function DashboardPage() {
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-8 space-y-12">
-          {/* Platform Grid */}
+          <KPIPulse />
+
+          <TaskQueue onSelectTask={setSelectedTask} />
+
+          {/* Connected Platforms */}
           <section className="space-y-6">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <Layers className="w-5 h-5 text-blue-500" /> Connected Platforms
+            <h2 className="text-xl font-bold flex items-center gap-2 text-white/50 italic">
+              <Globe className="w-5 h-5" /> Seed Infrastructure
             </h2>
             <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <motion.div variants={item}>
@@ -90,12 +95,10 @@ export default function DashboardPage() {
                 <PlatformCard name="Appen" icon={Globe} status="Online" tasksCount={12} avgPay="$15.00" risk="Medium" />
               </motion.div>
               <motion.div variants={item}>
-                <PlatformCard name="Clickworker" icon={Layers} status="Maintenance" tasksCount={0} avgPay="$0.00" risk="Low" className="opacity-60" />
+                <PlatformCard name="Clickworker" icon={Layers} status="Maintenance" tasksCount={0} avgPay="$0.00" risk="Low" className="opacity-40" />
               </motion.div>
             </motion.div>
           </section>
-
-          <TaskQueue onSelectTask={setSelectedTask} />
 
           {/* Escalation */}
           <section className="space-y-4">
@@ -104,7 +107,7 @@ export default function DashboardPage() {
             </h2>
             <div className="glass-card p-6 border-dashed border-amber-500/20 bg-amber-500/5 flex flex-col items-center justify-center gap-3 text-center">
               <p className="text-[11px] text-muted-foreground max-w-xs leading-relaxed">
-                <span className="text-white font-bold">0</span> tasks pending your attention. Fleet is running autonomously.
+                <span className="text-white font-bold">0</span> tasks pending your attention. Universal engine is running autonomously.
               </p>
             </div>
           </section>

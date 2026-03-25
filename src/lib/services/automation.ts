@@ -23,6 +23,22 @@ export class PhinixAutomation {
         return new Promise(resolve => setTimeout(resolve, delay));
     }
 
+    /**
+     * Universal Scraper Layer: Opens any URL
+     */
+    async openPage(url: string) {
+        if (!this.stagehand) await this.init();
+        const page = this.stagehand!.page;
+        console.log(`--- [Universal] Discovery: ${url} ---`);
+        await page.goto(url);
+        await this.humanWait(2000, 4000);
+    }
+
+    async getRawHTML() {
+        if (!this.stagehand) return "";
+        return await this.stagehand.page.content();
+    }
+
     async login(platform: string, credentials: any) {
         if (!this.stagehand) await this.init();
         const page = this.stagehand!.page;
