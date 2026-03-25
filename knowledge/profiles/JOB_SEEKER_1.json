@@ -1,0 +1,68 @@
+{
+    "profile_id": "JOB_SEEKER_1",
+    "personal": {
+        "full_name": "Nathan Krop",
+        "email": "neithank47@gmail.com",
+        "location": "Nairobi & Eldoret, Kenya",
+        "phone": "N/A"
+    },
+    "links": {
+        "github": "https://github.com/28dallas",
+        "linkedin": "https://www.linkedin.com/in/nathan-isaac-905632257",
+        "resume_url": "[PLEASE_PROVIDE_PDF_LINK]"
+    },
+    "technical_skills": {
+        "languages": [
+            "JavaScript",
+            "Python",
+            "Ruby"
+        ],
+        "frontend": [
+            "HTML",
+            "CSS",
+            "React"
+        ],
+        "backend": [
+            "REST APIs"
+        ],
+        "tools": [
+            "Git",
+            "GitHub"
+        ],
+        "other": [
+            "Responsive Design",
+            "API Integration"
+        ]
+    },
+    "professional_experience": [
+        {
+            "role": "Software Engineer",
+            "company": "Apex Blue Sky",
+            "highlights": [
+                "Developed responsive web applications using modern JavaScript technologies.",
+                "Optimized application performance and improved usability through testing and feedback.",
+                "Created technical documentation for maintainability."
+            ]
+        },
+        {
+            "role": "Software Development Intern",
+            "highlights": [
+                "Assisted in building full-stack applications and improving system functionality.",
+                "Collaborated with teams using Git and participated in code reviews.",
+                "Helped debug and optimize code."
+            ]
+        }
+    ],
+    "projects": [
+        "Event Connect Platform — Event service marketplace web app.",
+        "BlueskyAid — Service platform for transportation and emergency support.",
+        "Perur Rays Organisation Website",
+        "ShePokot Website — Community-focused platform.",
+        "Apex Blue Sky Website"
+    ],
+    "education": [
+        "Moringa School — Software Engineering Degree (Nov 2025)",
+        "University of Eastern Africa, Baraton — Undergraduate (English Literature)"
+    ],
+    "summary": "Results-driven Software Engineer trained at Moringa School with experience in full-stack development. Skilled in building scalable web applications and modern frameworks like React."
+}
