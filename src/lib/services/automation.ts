@@ -1,4 +1,5 @@
 import { Stagehand } from "@browserbasehq/stagehand";
+import { z } from "zod";
 
 export class PhinixAutomation {
     private stagehand: Stagehand | null = null;
@@ -8,11 +9,6 @@ export class PhinixAutomation {
             env: "LOCAL",
             apiKey: process.env.BROWSERBASE_API_KEY,
             projectId: process.env.BROWSERBASE_PROJECT_ID,
-            debugConfig: {
-                debug: true,
-                showBrowser: true,
-            },
-            modelName: "gpt-4o",
         });
         await this.stagehand.init();
     }
@@ -28,7 +24,7 @@ export class PhinixAutomation {
      */
     async openPage(url: string) {
         if (!this.stagehand) await this.init();
-        const page = this.stagehand!.page;
+        const page = await this.stagehand!.context.awaitActivePage();
         console.log(`--- [Universal] Discovery: ${url} ---`);
         await page.goto(url);
         await this.humanWait(2000, 4000);
@@ -36,12 +32,13 @@ export class PhinixAutomation {
 
     async getRawHTML() {
         if (!this.stagehand) return "";
-        return await this.stagehand.page.content();
+        const page = await this.stagehand.context.awaitActivePage();
+        return (await page.evaluate("document.documentElement.outerHTML")) as string;
     }
 
     async login(platform: string, credentials: any) {
         if (!this.stagehand) await this.init();
-        const page = this.stagehand!.page;
+        const page = await this.stagehand!.context.awaitActivePage();
 
         console.log(`--- Logging into ${platform} (Stealth Mode) ---`);
         await page.goto(platform === 'Toloka' ? 'https://toloka.ai/tasker/' : 'https://connect.appen.com/');
@@ -49,40 +46,30 @@ export class PhinixAutomation {
         await this.humanWait(3000, 6000); // Wait for page load naturally
 
         // Natural language automation with Stagehand 'act'
-        await page.act(`Click on the login button and enter credentials: ${credentials.email}`);
+        await this.stagehand!.act(`Click on the login button and enter credentials: ${credentials.email}`);
         await this.humanWait(1500, 3500);
-        await page.act(`Enter password and click Submit`);
+        await this.stagehand!.act(`Enter password and click Submit`);
 
         return page;
     }
 
     async scrapeTasks(platform: string) {
         if (!this.stagehand) await this.init();
-        const page = this.stagehand!.page;
 
         console.log(`--- Scraping tasks for ${platform} ---`);
         await this.humanWait(2000, 4000);
 
-        const tasks = await page.extract({
-            instruction: "Extract all available tasks from the dashboard, including their titles, payment amount, and estimated time.",
-            schema: {
-                type: "object",
-                properties: {
-                    tasks: {
-                        type: "array",
-                        items: {
-                            type: "object",
-                            properties: {
-                                title: { type: "string" },
-                                pay: { type: "string" },
-                                time: { type: "string" },
-                                url: { type: "string" }
-                            }
-                        }
-                    }
-                }
-            }
-        });
+        const tasks = await this.stagehand!.extract(
+            "Extract all available tasks from the dashboard, including their titles, payment amount, and estimated time.",
+            z.object({
+                tasks: z.array(z.object({
+                    title: z.string(),
+                    pay: z.string(),
+                    time: z.string(),
+                    url: z.string()
+                }))
+            })
+        );
 
         return tasks;
     }
@@ -95,7 +82,7 @@ export class PhinixAutomation {
      */
     async executeAndSubmit(taskUrl: string, suggestion: string, confidence: number) {
         if (!this.stagehand) await this.init();
-        const page = this.stagehand!.page;
+        const page = await this.stagehand!.context.awaitActivePage();
 
         console.log(`--- Executing Task: ${taskUrl} ---`);
         await page.goto(taskUrl);
@@ -105,7 +92,7 @@ export class PhinixAutomation {
         await this.humanWait(7000, 15000);
 
         // Natural execution
-        await page.act(`Select the option that matches '${suggestion}'`);
+        await this.stagehand!.act(`Select the option that matches '${suggestion}'`);
 
         // Thinking delay before submission
         await this.humanWait(3000, 5000);
@@ -113,7 +100,7 @@ export class PhinixAutomation {
         // Final Submission Check: Human-in-the-Loop Safeguard
         if (confidence >= 0.95) {
             console.log("Stealth: Safe auto-submission authorized.");
-            await page.act("Find and click the 'Submit' or 'Finish' button");
+            await this.stagehand!.act("Find and click the 'Submit' or 'Finish' button");
             return { success: true, method: 'AUTO-SUBMITTED' };
         } else {
             console.log("Stealth: Low confidence / High complexity. Escalating to human.");

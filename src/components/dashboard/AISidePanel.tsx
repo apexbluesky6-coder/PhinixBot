@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, BrainCircuit, ShieldAlert, Sparkles, CheckCircle, ChevronRight, Briefcase, FileText } from "lucide-react";
+import { X, BrainCircuit, ShieldAlert, Sparkles, CheckCircle, ChevronRight, Briefcase, FileText, Globe, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AISidePanelProps {

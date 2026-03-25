@@ -35,7 +35,7 @@ export class PhinixFleetManager {
                     matchScore: 0
                 });
 
-                if (analysis.topQueue && analysis.topQueue.length > 0) {
+                if (analysis.topQueue && Array.isArray(analysis.topQueue) && analysis.topQueue.length > 0) {
                     console.log(`[Fleet] Found ${analysis.topQueue.length} match(es) for ${worker.name}`);
                     // Tasks are automatically saved to daily_tasks by the Poller cycle.
                 }
