@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Activity, Layers, Zap, Globe, AlertTriangle } from "lucide-react";
+import { Sparkles, Activity, Layers, Zap, Globe, AlertTriangle, Send } from "lucide-react";
 import PlatformCard from "@/components/dashboard/PlatformCard";
 import TaskQueue from "@/components/dashboard/TaskQueue";
 import AISidePanel from "@/components/dashboard/AISidePanel";
@@ -24,10 +24,16 @@ const item = {
 export default function DashboardPage() {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [lastApplied, setLastApplied] = useState<string | null>(null);
 
   const handleSync = () => {
     setIsSyncing(true);
     setTimeout(() => setIsSyncing(false), 2000);
+  };
+
+  const handleQuickApply = () => {
+    setLastApplied("Senior React Developer");
+    setTimeout(() => setLastApplied(null), 3000);
   };
 
   return (
@@ -46,7 +52,7 @@ export default function DashboardPage() {
           className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 w-fit"
         >
           <Sparkles className="w-3 h-3 text-blue-400" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Universal Core Active</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Universal Core Active (Nathan Krop Profile)</span>
         </motion.div>
 
         <div className="flex items-end justify-between">
@@ -55,23 +61,39 @@ export default function DashboardPage() {
               Phinix Fleet Command
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl">
-              <span className="text-white font-bold">2 workers + 1 AI agent</span> operating across <span className="text-white font-bold">ANY website</span>. Morning Routine active.
+              <span className="text-white font-bold">Nathan Krop</span> + 1 AI agent operating across ANY website. Morning Routine active.
             </p>
           </div>
 
-          <button
-            onClick={handleSync}
-            disabled={isSyncing}
-            className="glass-card px-6 py-4 flex items-center gap-4 bg-blue-600/10 border-blue-500/20 hover:bg-blue-600/20 transition-all active:scale-95 group disabled:opacity-50"
-          >
-            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-600 transition-all">
-              <Activity className={`text-blue-500 w-5 h-5 group-hover:text-white ${isSyncing ? "animate-spin" : ""}`} />
-            </div>
-            <div className="text-left">
-              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Universal Pulse</p>
-              <p className="text-lg font-bold">{isSyncing ? "Syncing..." : "24/7 Monitoring"}</p>
-            </div>
-          </button>
+          <div className="flex gap-4">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleQuickApply}
+              className="glass-card px-8 py-4 bg-emerald-500 text-white border-emerald-400/50 hover:bg-emerald-400 transition-all flex items-center gap-3 relative"
+            >
+              <Send className="w-4 h-4" />
+              <div className="text-left">
+                <p className="text-[10px] uppercase font-black tracking-tighter opacity-70">Top Match Ready</p>
+                <p className="text-sm font-black">{lastApplied ? "Applied!" : "Quick Apply Now"}</p>
+              </div>
+              {lastApplied && <div className="absolute inset-0 bg-emerald-500 flex items-center justify-center rounded-xl animate-in fade-in zoom-in font-bold">Success!</div>}
+            </motion.button>
+
+            <button
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="glass-card px-6 py-4 flex items-center gap-4 bg-blue-600/10 border-blue-500/20 hover:bg-blue-600/20 transition-all active:scale-95 group disabled:opacity-50"
+            >
+              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-600 transition-all">
+                <Activity className={`text-blue-500 w-5 h-5 group-hover:text-white ${isSyncing ? "animate-spin" : ""}`} />
+              </div>
+              <div className="text-left">
+                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Universal Pulse</p>
+                <p className="text-lg font-bold">{isSyncing ? "Syncing..." : "24/7 Monitoring"}</p>
+              </div>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -79,10 +101,8 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-8 space-y-12">
           <KPIPulse />
-
           <TaskQueue onSelectTask={setSelectedTask} />
 
-          {/* Connected Platforms */}
           <section className="space-y-6">
             <h2 className="text-xl font-bold flex items-center gap-2 text-white/50 italic">
               <Globe className="w-5 h-5" /> Seed Infrastructure
