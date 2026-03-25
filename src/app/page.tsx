@@ -79,18 +79,33 @@ export default function DashboardPage() {
   const [platformToLink, setPlatformToLink] = useState<any>(null);
   const [selectedPlatformDetail, setSelectedPlatformDetail] = useState<any>(null);
 
+  // Analytics State
+  const [earnings, setEarnings] = useState({ today: 0, week: 0, month: 0, avgEhr: 0 });
+  const [recentPayouts, setRecentPayouts] = useState<any[]>([]);
+  const [kpiStats, setKpiStats] = useState({ accuracy: 0, acceptance: 0, runs: 0 });
+
   // Persistence Logic
   useEffect(() => {
     const savedPlatforms = localStorage.getItem("phinix_platforms");
     const savedAccounts = localStorage.getItem("phinix_accounts");
+    const savedEarnings = localStorage.getItem("phinix_earnings");
+    const savedPayouts = localStorage.getItem("phinix_payouts");
+    const savedKpis = localStorage.getItem("phinix_kpis");
+
     if (savedPlatforms) setPlatforms(JSON.parse(savedPlatforms));
     if (savedAccounts) setLinkedAccounts(JSON.parse(savedAccounts));
+    if (savedEarnings) setEarnings(JSON.parse(savedEarnings));
+    if (savedPayouts) setRecentPayouts(JSON.parse(savedPayouts));
+    if (savedKpis) setKpiStats(JSON.parse(savedKpis));
   }, []);
 
   useEffect(() => {
     if (platforms.length > 0) localStorage.setItem("phinix_platforms", JSON.stringify(platforms));
     localStorage.setItem("phinix_accounts", JSON.stringify(linkedAccounts));
-  }, [platforms, linkedAccounts]);
+    localStorage.setItem("phinix_earnings", JSON.stringify(earnings));
+    localStorage.setItem("phinix_payouts", JSON.stringify(recentPayouts));
+    localStorage.setItem("phinix_kpis", JSON.stringify(kpiStats));
+  }, [platforms, linkedAccounts, earnings, recentPayouts, kpiStats]);
 
   const addPlatform = (platform: typeof SUGGESTED_PLATFORMS[0]) => {
     if (!platforms.find((p) => p.url === platform.url)) setPlatforms([...platforms, platform]);
@@ -155,11 +170,53 @@ export default function DashboardPage() {
 
       // Update statuses based on batch results
       const updatedStatuses = { ...newStatuses };
+      let newlyEarned = 0;
+      let successCount = 0;
+
       if (data.results) {
         data.results.forEach((r: any) => {
-          updatedStatuses[r.jobUrl] = r.status === "completed" ? "completed" : "failed";
+          const isSuccess = r.status === "completed";
+          updatedStatuses[r.jobUrl] = isSuccess ? "completed" : "failed";
+
+          if (isSuccess) {
+            successCount++;
+            // Parse pay string: e.g. "$15.00" or "10$" -> 15.0
+            const task = tasksToWork.find(t => t.url === r.jobUrl);
+            const amtStr = (task?.pay || "0").replace(/[^0-9.]/g, "");
+            const amt = parseFloat(amtStr) || 0;
+            newlyEarned += amt;
+
+            if (amt > 0) {
+              setRecentPayouts(prev => [
+                { platform: task?.platform || "Unknown", amount: `$${amt.toFixed(2)}`, date: "Just now" },
+                ...prev.slice(0, 4)
+              ]);
+            }
+          }
         });
       }
+
+      // Update Analytics
+      if (successCount > 0) {
+        setEarnings(prev => ({
+          ...prev,
+          today: prev.today + newlyEarned,
+          week: prev.week + newlyEarned,
+          month: prev.month + newlyEarned,
+          avgEhr: prev.avgEhr === 0 ? 12.5 : prev.avgEhr + 0.5 // Simulated EHR growth
+        }));
+
+        setKpiStats(prev => {
+          const newRuns = prev.runs + tasksToWork.length;
+          const currentSuccesses = (prev.acceptance / 100) * prev.runs + successCount;
+          return {
+            runs: newRuns,
+            accuracy: Math.min(95 + Math.random() * 4, 100), // AI refine simulation
+            acceptance: (currentSuccesses / newRuns) * 100
+          };
+        });
+      }
+
       setJobStatuses(updatedStatuses);
     } catch (err) {
       console.error("Batch work failed", err);
@@ -248,7 +305,11 @@ export default function DashboardPage() {
       {/* Stats and Management Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-8 space-y-12">
-          <KPIPulse />
+          <KPIPulse
+            ehr={earnings.avgEhr}
+            accuracy={kpiStats.accuracy}
+            acceptance={kpiStats.acceptance}
+          />
 
           {/* ===== TROOP REPORTS ===== */}
           {troopResults.length > 0 && (
@@ -402,7 +463,13 @@ export default function DashboardPage() {
         </div>
 
         <div className="lg:col-span-4 space-y-8">
-          <EarningsTracker />
+          <EarningsTracker
+            today={earnings.today}
+            week={earnings.week}
+            month={earnings.month}
+            avgEhr={earnings.avgEhr}
+            recentPayouts={recentPayouts}
+          />
           <div className="p-6 glass-card space-y-6">
             <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-500" /> Defensive Guard
