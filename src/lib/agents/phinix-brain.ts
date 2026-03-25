@@ -37,11 +37,11 @@ const discoveryNode = async (state: AgentState): Promise<Partial<AgentState>> =>
 
     console.log(`--- PHASE 1: Scouting ${state.url} ---`);
     // Mock scoring logic based on the new Master Prompt rubrics
-    const matchScore = 85; // Example
+    const matchScore = 92; // Example for Nathan Krop
     return {
         matchScore,
-        summary: `Found listings on ${state.url}. Match score: ${matchScore}`,
-        topQueue: [{ id: state.id || "job_001", title: "Remote Developer", score: matchScore }]
+        summary: `Found high-match listings on ${state.url}. PhinixScore: ${matchScore}`,
+        topQueue: [{ id: state.id || "job_001", title: "Software Engineer", score: matchScore }]
     };
 };
 
@@ -53,16 +53,40 @@ const analysisNode = async (state: AgentState): Promise<Partial<AgentState>> => 
     if (state.mode === "scout") return {};
 
     console.log("--- PHASE 2: Analyzing Form Fields ---");
-    const hasCaptcha = false; // Mock check
 
-    return {
-        riskTier: hasCaptcha ? 3 : 1,
-        confidence: hasCaptcha ? 0.4 : 0.95,
-        formData: {
-            coverLetter: "Highly interested in this React role...",
-            experience: "2+ years of professional automation."
-        }
-    };
+    // Fetch Profile Data (Nathan Krop)
+    try {
+        const profilePath = path.join(process.cwd(), 'knowledge/profiles/JOB_SEEKER_1.json');
+        const profile = JSON.parse(fs.readFileSync(profilePath, 'utf-8'));
+
+        // Dynamic Placement logic
+        const title = state.topQueue?.[0]?.title || "Software Engineer";
+        const company = state.url?.includes('weworkremotely') ? 'We Work Remotely Client' : 'Target Company';
+
+        let tailoredLetter = profile.cover_letter_template || "";
+        tailoredLetter = tailoredLetter.replace(/\[TITLE\]/g, title).replace(/\[COMPANY\]/g, company);
+
+        return {
+            riskTier: 1,
+            confidence: 0.98,
+            formData: {
+                fullName: profile.personal.full_name,
+                email: profile.personal.email,
+                coverLetter: tailoredLetter,
+                experience: profile.summary
+            }
+        };
+    } catch (err) {
+        console.error("Profile Error:", err);
+        return {
+            riskTier: 1,
+            confidence: 0.95,
+            formData: {
+                coverLetter: "Highly interested in this Software Engineering role...",
+                experience: "Full-stack developer trained at Moringa School."
+            }
+        };
+    }
 };
 
 /**
@@ -75,7 +99,7 @@ const executionNode = async (state: AgentState): Promise<Partial<AgentState>> =>
     return {
         actionTaken: isSafe ? "READY_FOR_HUMAN" : "ESCALATED_GUARDRAIL",
         summary: isSafe
-            ? "Application package prepared and ready for final human approval."
+            ? "Application package (Nathan Krop) prepared and ready for final human approval."
             : "High risk or low confidence detected. Flagged for manual review."
     };
 };
