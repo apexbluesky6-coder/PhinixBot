@@ -151,8 +151,8 @@ export default function DashboardPage() {
               disabled={platforms.length === 0 || isDeploying}
               onClick={deployTroops}
               className={`glass-card px-8 py-4 transition-all flex items-center gap-3 ${platforms.length > 0
-                  ? "bg-emerald-500 text-white border-emerald-400/50 hover:bg-emerald-400"
-                  : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed"
+                ? "bg-emerald-500 text-white border-emerald-400/50 hover:bg-emerald-400"
+                : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed"
                 } disabled:opacity-50`}
             >
               {isDeploying ? (
@@ -231,10 +231,10 @@ export default function DashboardPage() {
                       <div className="flex items-center gap-4">
                         <div
                           className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${troop.status === "found"
-                              ? "bg-emerald-500/10 border border-emerald-500/20"
-                              : troop.status === "error"
-                                ? "bg-red-500/10 border border-red-500/20"
-                                : "bg-blue-500/10 border border-blue-500/20"
+                            ? "bg-emerald-500/10 border border-emerald-500/20"
+                            : troop.status === "error"
+                              ? "bg-red-500/10 border border-red-500/20"
+                              : "bg-blue-500/10 border border-blue-500/20"
                             }`}
                         >
                           {troop.status === "found" ? (
@@ -254,10 +254,10 @@ export default function DashboardPage() {
                       <div className="flex items-center gap-4">
                         <span
                           className={`text-xs font-bold px-2 py-1 rounded-full ${troop.status === "found"
-                              ? "bg-emerald-500/20 text-emerald-400"
-                              : troop.status === "error"
-                                ? "bg-red-500/20 text-red-400"
-                                : "bg-blue-500/20 text-blue-400"
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : troop.status === "error"
+                              ? "bg-red-500/20 text-red-400"
+                              : "bg-blue-500/20 text-blue-400"
                             }`}
                         >
                           {troop.status === "found"
@@ -294,10 +294,11 @@ export default function DashboardPage() {
                           {troop.jobs.map((job, ji) => (
                             <div
                               key={ji}
-                              className="flex items-center justify-between p-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors"
+                              onClick={() => setSelectedTask({ ...job, id: `TRP-${ji}`, platform: troop.platform })}
+                              className="flex items-center justify-between p-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors cursor-pointer group/job"
                             >
                               <div className="flex items-center gap-4">
-                                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover/job:bg-blue-500/20 transition-all">
                                   {job.type === "Microtask" ? (
                                     <Zap className="w-4 h-4 text-emerald-400" />
                                   ) : (
@@ -305,7 +306,7 @@ export default function DashboardPage() {
                                   )}
                                 </div>
                                 <div>
-                                  <p className="text-sm font-bold text-white">{job.title}</p>
+                                  <p className="text-sm font-bold text-white group-hover/job:text-blue-400 transition-colors">{job.title}</p>
                                   <p className="text-xs text-muted-foreground">{job.company}</p>
                                 </div>
                               </div>
@@ -318,6 +319,7 @@ export default function DashboardPage() {
                                   href={job.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
                                   className="text-blue-400 hover:text-blue-300"
                                 >
                                   <ExternalLink className="w-3.5 h-3.5" />
@@ -453,8 +455,8 @@ export default function DashboardPage() {
                         <span className="text-xl">{p.icon}</span>
                         <span
                           className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${isAdded
-                              ? "bg-emerald-500/20 text-emerald-400"
-                              : "bg-white/5 text-muted-foreground"
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : "bg-white/5 text-muted-foreground"
                             }`}
                         >
                           {isAdded ? "✓ Added" : p.type}
