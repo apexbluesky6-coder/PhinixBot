@@ -23,17 +23,40 @@ export interface WorkResult {
  */
 export class TroopCommander {
     private maxConcurrent = 2; // Default limit for local execution
+    private isStopped = false;
+
+    /**
+     * Emergency Halt: Stops further task processing
+     */
+    stop() {
+        console.log("🛑 [Commander] EMERGENCY HALT SIGNAL RECEIVED.");
+        this.isStopped = true;
+    }
+
+    /**
+     * Reset safety flag for new deployments
+     */
+    reset() {
+        this.isStopped = false;
+    }
 
     /**
      * Deploy multiple work troops concurrently
      */
     async deployWorkTroops(tasks: WorkTask[]): Promise<WorkResult[]> {
+        this.reset(); // Always reset before a new run
         console.log(`\n🪖 COMMMANDER: Deploying ${tasks.length} Work Troops concurrently...\n`);
 
         const results: WorkResult[] = [];
 
         // Split tasks into batches to respect concurrency limits
         for (let i = 0; i < tasks.length; i += this.maxConcurrent) {
+            // Check for emergency stop
+            if (this.isStopped) {
+                console.warn("🛑 [Commander] Stopping Fleet Deployment: Execution Aborted.");
+                break;
+            }
+
             const batch = tasks.slice(i, i + this.maxConcurrent);
             console.log(`📦 Working Batch: ${i / this.maxConcurrent + 1}`);
 

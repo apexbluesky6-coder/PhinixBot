@@ -85,6 +85,7 @@ export default function DashboardPage() {
   const [recentPayouts, setRecentPayouts] = useState<any[]>([]);
   const [kpiStats, setKpiStats] = useState({ accuracy: 0, acceptance: 0, runs: 0 });
   const [isGlobalDeploying, setIsGlobalDeploying] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
 
   // Persistence Logic
   useEffect(() => {
@@ -113,6 +114,22 @@ export default function DashboardPage() {
     if (!platforms.find((p) => p.url === platform.url)) setPlatforms([...platforms, platform]);
   };
   const removePlatform = (url: string) => setPlatforms(platforms.filter((p) => p.url !== url));
+
+  // === FLEET CONTROL ===
+  const handleEmergencyStop = async () => {
+    setIsStopping(true);
+    try {
+      await fetch("/api/stop-fleet", { method: "POST" });
+      // Reset local UI states to allow user interaction
+      setIsGlobalDeploying(false);
+      setIsWorkingAll(false);
+      setIsDeploying(false);
+    } catch (err) {
+      console.error("Stop signal failed", err);
+    } finally {
+      setIsStopping(false);
+    }
+  };
 
   // === SCOUTING LOGIC ===
   const deployScoutTroops = async (specificPlatforms?: any[]) => {
@@ -314,51 +331,73 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex gap-4 items-end">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              disabled={platforms.length === 0 || isGlobalDeploying}
-              onClick={activateGlobalFleet}
-              className={cn("glass-card px-10 py-5 flex items-center gap-4 transition-all border-blue-500/50 relative overflow-hidden group",
-                platforms.length > 0 ? "bg-blue-600 text-white shadow-[0_0_40px_rgba(59,130,246,0.3)] hover:shadow-[0_0_60px_rgba(59,130,246,0.5)]" : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed")}
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-shimmer" />
-              {isGlobalDeploying ? <RefreshCw className="w-6 h-6 animate-spin" /> : <Play className="w-6 h-6 fill-current" />}
-              <div className="text-left relative z-10">
-                <p className="text-[10px] uppercase font-black tracking-[0.2em] opacity-80">Full Autonomy</p>
-                <p className="text-xl font-black">{isGlobalDeploying ? "ENGAGING FLEET..." : "ACTIVATE GLOBAL FLEET"}</p>
-              </div>
-            </motion.button>
+            {(isGlobalDeploying || isWorkingAll || isDeploying) ? (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleEmergencyStop}
+                disabled={isStopping}
+                className="glass-card px-10 py-5 bg-red-600/20 border-red-500/50 text-red-400 hover:bg-red-600/30 transition-all flex items-center gap-4 group shadow-[0_0_40px_rgba(239,68,68,0.2)]"
+              >
+                {isStopping ? <Loader2 className="w-6 h-6 animate-spin text-red-400" /> : <AlertTriangle className="w-6 h-6 text-red-500 animate-pulse" />}
+                <div className="text-left">
+                  <p className="text-[10px] uppercase font-black tracking-[0.2em] text-red-500/80">Safety Protocol</p>
+                  <p className="text-xl font-black">{isStopping ? "HALTING..." : "EMERGENCY HALT"}</p>
+                </div>
+              </motion.button>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                disabled={platforms.length === 0 || isGlobalDeploying}
+                onClick={activateGlobalFleet}
+                className={cn("glass-card px-10 py-5 flex items-center gap-4 transition-all border-blue-500/50 relative overflow-hidden group",
+                  platforms.length > 0 ? "bg-blue-600 text-white shadow-[0_0_40px_rgba(59,130,246,0.3)] hover:shadow-[0_0_60px_rgba(59,130,246,0.5)]" : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed")}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-shimmer" />
+                {isGlobalDeploying ? <RefreshCw className="w-6 h-6 animate-spin" /> : <Play className="w-6 h-6 fill-current" />}
+                <div className="text-left relative z-10">
+                  <p className="text-[10px] uppercase font-black tracking-[0.2em] opacity-80">Full Autonomy</p>
+                  <p className="text-xl font-black">{isGlobalDeploying ? "ENGAGING FLEET..." : "ACTIVATE GLOBAL FLEET"}</p>
+                </div>
+              </motion.button>
+            )}
 
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              disabled={platforms.length === 0 || isDeploying || isGlobalDeploying}
-              onClick={() => deployScoutTroops()}
-              className={cn("glass-card px-8 py-4 flex items-center gap-3 transition-all",
-                platforms.length > 0 ? "bg-white/5 text-white border-white/10 hover:bg-white/10" : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed")}
-            >
-              {isDeploying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
-              <div className="text-left">
-                <p className="text-[10px] uppercase font-black tracking-tighter opacity-70">Scouting</p>
-                <p className="text-sm font-black">{isDeploying ? "Deploying..." : "Scout Only"}</p>
-              </div>
-            </motion.button>
+            {!isGlobalDeploying && !isWorkingAll && !isDeploying && (
+              <>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  disabled={platforms.length === 0}
+                  onClick={() => deployScoutTroops()}
+                  className={cn("glass-card px-8 py-4 flex items-center gap-3 transition-all",
+                    platforms.length > 0 ? "bg-white/5 text-white border-white/10 hover:bg-white/10" : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed")}
+                >
+                  <Activity className="w-4 h-4" />
+                  <div className="text-left">
+                    <p className="text-[10px] uppercase font-black tracking-tighter opacity-70">Scouting</p>
+                    <p className="text-sm font-black">Scout Only</p>
+                  </div>
+                </motion.button>
 
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              disabled={selectedJobUrls.size === 0 || isWorkingAll || isGlobalDeploying}
-              onClick={() => deployWorkTroops()}
-              className={cn("glass-card px-8 py-4 flex items-center gap-3 transition-all",
-                selectedJobUrls.size > 0 ? "bg-emerald-500 text-white border-emerald-400/50 hover:bg-emerald-400 shadow-xl shadow-emerald-500/20" : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed")}
-            >
-              {isWorkingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
-              <div className="text-left">
-                <p className="text-[10px] uppercase font-black tracking-tighter opacity-70">Action</p>
-                <p className="text-sm font-black">{isWorkingAll ? "Working..." : selectedJobUrls.size > 0 ? `Apply (${selectedJobUrls.size})` : "Manual Apply"}</p>
-              </div>
-            </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  disabled={selectedJobUrls.size === 0}
+                  onClick={() => deployWorkTroops()}
+                  className={cn("glass-card px-8 py-4 flex items-center gap-3 transition-all",
+                    selectedJobUrls.size > 0 ? "bg-emerald-500 text-white border-emerald-400/50 hover:bg-emerald-400 shadow-xl shadow-emerald-500/20" : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed")}
+                >
+                  <Rocket className="w-4 h-4" />
+                  <div className="text-left">
+                    <p className="text-[10px] uppercase font-black tracking-tighter opacity-70">Action</p>
+                    <p className="text-sm font-black">{selectedJobUrls.size > 0 ? `Apply (${selectedJobUrls.size})` : "Manual Apply"}</p>
+                  </div>
+                </motion.button>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -479,7 +518,11 @@ export default function DashboardPage() {
             )}
 
             <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {SUGGESTED_PLATFORMS.map(p => {
+              {/* Combine Added Platforms (including Custom) and Un-added Suggested ones */}
+              {[
+                ...platforms,
+                ...SUGGESTED_PLATFORMS.filter(p => !platforms.find(pl => pl.url === p.url))
+              ].map(p => {
                 const isAdded = platforms.find(pl => pl.url === p.url);
                 const isLinked = linkedAccounts[p.url];
                 const domain = new URL(p.url).hostname;
@@ -488,14 +531,15 @@ export default function DashboardPage() {
                 return (
                   <motion.div key={p.url} variants={item}
                     onClick={() => isAdded && setSelectedPlatformDetail(p)}
-                    className={cn("glass-card p-4 text-left transition-all relative group flex flex-col",
-                      isAdded ? "border-emerald-500/30 bg-emerald-500/5 shadow-lg shadow-emerald-500/5 cursor-pointer hover:shadow-emerald-500/10" : "hover:border-blue-500/30 cursor-default")}>
+                    className={cn("glass-card p-4 text-left transition-all relative group flex flex-col min-h-[160px]",
+                      isAdded ? "border-blue-500/30 bg-blue-500/5 shadow-lg shadow-blue-500/5 cursor-pointer hover:shadow-blue-500/10" : "hover:border-white/20 cursor-default opacity-60 hover:opacity-100")}
+                  >
                     <div className="flex items-center justify-between mb-3">
                       <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 overflow-hidden">
                         <img src={logoUrl} alt={p.name} className="w-5 h-5 object-contain opacity-50 group-hover:opacity-100 transition-opacity" />
                       </div>
                       <div className="flex items-center gap-2">
-                        {isAdded && <CheckCircle className="w-4 h-4 text-emerald-400" />}
+                        {isAdded && <CheckCircle className="w-4 h-4 text-blue-400" />}
                         {isAdded && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setPlatformToLink(p); }}
