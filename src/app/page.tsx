@@ -6,7 +6,8 @@ import {
   Sparkles, Activity, Globe, AlertTriangle, Plus, X,
   Rocket, ExternalLink, Loader2, CheckCircle, XCircle,
   Briefcase, Zap, ChevronDown, ChevronUp, MousePointer2,
-  ListChecks, Target, Coins, ShieldCheck, Lock
+  ListChecks, Target, Coins, ShieldCheck, Lock,
+  RefreshCw, Play, Search
 } from "lucide-react";
 import AISidePanel from "@/components/dashboard/AISidePanel";
 import AccountLinker from "@/components/dashboard/AccountLinker";
@@ -83,6 +84,7 @@ export default function DashboardPage() {
   const [earnings, setEarnings] = useState({ today: 0, week: 0, month: 0, avgEhr: 0 });
   const [recentPayouts, setRecentPayouts] = useState<any[]>([]);
   const [kpiStats, setKpiStats] = useState({ accuracy: 0, acceptance: 0, runs: 0 });
+  const [isGlobalDeploying, setIsGlobalDeploying] = useState(false);
 
   // Persistence Logic
   useEffect(() => {
@@ -115,7 +117,7 @@ export default function DashboardPage() {
   // === SCOUTING LOGIC ===
   const deployScoutTroops = async (specificPlatforms?: any[]) => {
     const targetPlatforms = specificPlatforms || platforms;
-    if (targetPlatforms.length === 0) return;
+    if (targetPlatforms.length === 0) return null;
 
     setIsDeploying(true);
     setDeployError(null);
@@ -130,17 +132,20 @@ export default function DashboardPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
+      const results = data.results || [];
       if (specificPlatforms) {
         // Merge results if specific
         setTroopResults(prev => {
           const others = prev.filter(r => !specificPlatforms.find(sp => sp.name === r.platform));
-          return [...others, ...(data.results || [])];
+          return [...others, ...results];
         });
       } else {
-        setTroopResults(data.results || []);
+        setTroopResults(results);
       }
+      return results;
     } catch (err: any) {
       setDeployError(err.message || "Network error");
+      return null;
     } finally {
       setIsDeploying(false);
     }
@@ -154,17 +159,20 @@ export default function DashboardPage() {
     setSelectedJobUrls(newSet);
   };
 
-  const deployWorkTroops = async () => {
-    if (selectedJobUrls.size === 0) return;
-    setIsWorkingAll(true);
+  const deployWorkTroops = async (overrideTasks?: TroopJob[]) => {
+    const tasksToWork: TroopJob[] = overrideTasks || [];
 
-    // Create list of tasks from selection
-    const tasksToWork: TroopJob[] = [];
-    troopResults.forEach(r => {
-      r.jobs.forEach(j => {
-        if (selectedJobUrls.has(j.url)) tasksToWork.push({ ...j, platform: r.platform });
+    if (!overrideTasks) {
+      if (selectedJobUrls.size === 0) return;
+      troopResults.forEach(r => {
+        r.jobs.forEach(j => {
+          if (selectedJobUrls.has(j.url)) tasksToWork.push({ ...j, platform: r.platform });
+        });
       });
-    });
+    }
+
+    if (tasksToWork.length === 0) return;
+    setIsWorkingAll(true);
 
     // Mark all selected as working
     const newStatuses = { ...jobStatuses };
@@ -237,6 +245,29 @@ export default function DashboardPage() {
     }
   };
 
+  const activateGlobalFleet = async () => {
+    if (platforms.length === 0) return;
+    setIsGlobalDeploying(true);
+
+    try {
+      // 1. Scout All
+      const results = await deployScoutTroops();
+      if (!results || results.length === 0) return;
+
+      // 2. Auto-Select All
+      const allJobs = results.flatMap((r: any) => r.jobs.map((j: any) => ({ ...j, platform: r.platform })));
+      const allUrls = new Set<string>(allJobs.map((j: any) => j.url));
+      setSelectedJobUrls(allUrls);
+
+      // 3. Deploy Work
+      if (allJobs.length > 0) {
+        await deployWorkTroops(allJobs);
+      }
+    } finally {
+      setIsGlobalDeploying(false);
+    }
+  };
+
   const totalResults = troopResults.reduce((sum, t) => sum + t.jobs.length, 0);
 
   return (
@@ -282,34 +313,50 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-end">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              disabled={platforms.length === 0 || isDeploying}
-              onClick={() => deployScoutTroops()}
-              className={cn("glass-card px-8 py-4 flex items-center gap-3 transition-all",
-                platforms.length > 0 ? "bg-blue-600 text-white border-blue-400/50 hover:bg-blue-500" : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed")}
+              disabled={platforms.length === 0 || isGlobalDeploying}
+              onClick={activateGlobalFleet}
+              className={cn("glass-card px-10 py-5 flex items-center gap-4 transition-all border-blue-500/50 relative overflow-hidden group",
+                platforms.length > 0 ? "bg-blue-600 text-white shadow-[0_0_40px_rgba(59,130,246,0.3)] hover:shadow-[0_0_60px_rgba(59,130,246,0.5)]" : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed")}
             >
-              {isDeploying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
-              <div className="text-left">
-                <p className="text-[10px] uppercase font-black tracking-tighter opacity-70">Scouting Intelligence</p>
-                <p className="text-sm font-black">{isDeploying ? "Deploying Scouts..." : "Deploy Scouts"}</p>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-shimmer" />
+              {isGlobalDeploying ? <RefreshCw className="w-6 h-6 animate-spin" /> : <Play className="w-6 h-6 fill-current" />}
+              <div className="text-left relative z-10">
+                <p className="text-[10px] uppercase font-black tracking-[0.2em] opacity-80">Full Autonomy</p>
+                <p className="text-xl font-black">{isGlobalDeploying ? "ENGAGING FLEET..." : "ACTIVATE GLOBAL FLEET"}</p>
               </div>
             </motion.button>
 
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              disabled={selectedJobUrls.size === 0 || isWorkingAll}
-              onClick={deployWorkTroops}
+              disabled={platforms.length === 0 || isDeploying || isGlobalDeploying}
+              onClick={() => deployScoutTroops()}
+              className={cn("glass-card px-8 py-4 flex items-center gap-3 transition-all",
+                platforms.length > 0 ? "bg-white/5 text-white border-white/10 hover:bg-white/10" : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed")}
+            >
+              {isDeploying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+              <div className="text-left">
+                <p className="text-[10px] uppercase font-black tracking-tighter opacity-70">Scouting</p>
+                <p className="text-sm font-black">{isDeploying ? "Deploying..." : "Scout Only"}</p>
+              </div>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              disabled={selectedJobUrls.size === 0 || isWorkingAll || isGlobalDeploying}
+              onClick={() => deployWorkTroops()}
               className={cn("glass-card px-8 py-4 flex items-center gap-3 transition-all",
                 selectedJobUrls.size > 0 ? "bg-emerald-500 text-white border-emerald-400/50 hover:bg-emerald-400 shadow-xl shadow-emerald-500/20" : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed")}
             >
               {isWorkingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
               <div className="text-left">
-                <p className="text-[10px] uppercase font-black tracking-tighter opacity-70">Action Phase</p>
-                <p className="text-sm font-black">{isWorkingAll ? "Troops Working..." : selectedJobUrls.size > 0 ? `Deploy ${selectedJobUrls.size} Work Troops` : "No Selection"}</p>
+                <p className="text-[10px] uppercase font-black tracking-tighter opacity-70">Action</p>
+                <p className="text-sm font-black">{isWorkingAll ? "Working..." : selectedJobUrls.size > 0 ? `Apply (${selectedJobUrls.size})` : "Manual Apply"}</p>
               </div>
             </motion.button>
           </div>
