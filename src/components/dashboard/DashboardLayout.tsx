@@ -5,7 +5,8 @@ import Sidebar from "./Sidebar";
 import AccountSettings from "./AccountSettings";
 import ExecutionLogs from "./ExecutionLogs";
 import FleetOverview from "./FleetOverview";
-import { Activity } from "lucide-react";
+import SettingsPanel from "./SettingsPanel";
+import KPIPulse from "./KPIPulse";
 
 export default function DashboardLayout({
     children,
@@ -43,13 +44,15 @@ export default function DashboardLayout({
                         </div>
                     )}
 
-                    {(activeSegment === "memory" || activeSegment === "settings") && (
-                        <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center animate-pulse">
-                                <Activity className="w-8 h-8 text-blue-500" />
-                            </div>
-                            <h2 className="text-2xl font-bold tracking-tight">Segment Developing</h2>
-                            <p className="text-muted-foreground italic">Phinix Intelligence is building this interface...</p>
+                    {activeSegment === "memory" && (
+                        <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+                            <KPIPulse />
+                        </div>
+                    )}
+
+                    {activeSegment === "settings" && (
+                        <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+                            <SettingsPanel />
                         </div>
                     )}
                 </div>
