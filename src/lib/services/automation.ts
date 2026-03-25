@@ -56,10 +56,15 @@ export class PhinixAutomation {
         const page = await this.stagehand!.context.awaitActivePage();
 
         console.log(`--- Logging into ${platform} (Stealth Mode) ---`);
-        const loginUrl = platform === 'Toloka' ? 'https://toloka.ai/tasker/' :
-            platform === 'Upwork' ? 'https://www.upwork.com/ab/account-security/login' :
-                'https://connect.appen.com/';
 
+        // Use Specific Account URL if provided, otherwise fallback to defaults
+        const loginUrl = credentials.accountUrl || (
+            platform === 'Toloka' ? 'https://toloka.ai/tasker/' :
+                platform === 'Upwork' ? 'https://www.upwork.com/ab/account-security/login' :
+                    'https://connect.appen.com/'
+        );
+
+        console.log(`Stealth: Navigating to ${loginUrl}`);
         await page.goto(loginUrl);
         await this.humanWait(3000, 6000);
 
@@ -67,9 +72,16 @@ export class PhinixAutomation {
         if (credentials.username || credentials.email) {
             await this.stagehand!.act(`Enter username/email: ${credentials.username || credentials.email}`);
             await this.humanWait(1500, 3000);
+
             if (credentials.password) {
                 await this.stagehand!.act(`Enter password and click the primary login/submit button`);
                 await this.humanWait(3000, 5000);
+            }
+
+            // Handle secondary identifiers if prompted
+            if (credentials.phone || credentials.accountId) {
+                const prompt = `If prompted for a phone number use '${credentials.phone}' or for an ID use '${credentials.accountId}'. If not prompted, proceed.`;
+                await this.stagehand!.act(prompt);
             }
         }
 

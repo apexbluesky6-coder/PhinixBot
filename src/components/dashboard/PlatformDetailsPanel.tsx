@@ -15,10 +15,22 @@ interface PlatformDetailsPanelProps {
     platform: any;
     linkedData?: any;
     troopLogs?: any[];
+    onRescan?: () => Promise<void>; // New: Rescan callback
 }
 
-export default function PlatformDetailsPanel({ isOpen, onClose, platform, linkedData, troopLogs = [] }: PlatformDetailsPanelProps) {
+export default function PlatformDetailsPanel({ isOpen, onClose, platform, linkedData, troopLogs = [], onRescan }: PlatformDetailsPanelProps) {
+    const [isRescanning, setIsRescanning] = useState(false);
     if (!platform) return null;
+
+    const handleRescan = async () => {
+        if (!onRescan) return;
+        setIsRescanning(true);
+        try {
+            await onRescan();
+        } finally {
+            setIsRescanning(false);
+        }
+    };
 
     const domain = new URL(platform.url).hostname;
     const logoUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
@@ -144,8 +156,16 @@ export default function PlatformDetailsPanel({ isOpen, onClose, platform, linked
                             </div>
 
                             <div className="pt-6">
-                                <button className="w-full py-4 glass-card border-blue-500/20 hover:bg-blue-500 hover:text-white transition-all font-bold flex items-center justify-center gap-2 group text-sm">
-                                    Initiate Full Site Re-Scan <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                <button
+                                    onClick={handleRescan}
+                                    disabled={isRescanning}
+                                    className="w-full py-4 glass-card border-blue-500/20 hover:bg-blue-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold flex items-center justify-center gap-2 group text-sm"
+                                >
+                                    {isRescanning ? (
+                                        <><RefreshCw className="w-4 h-4 animate-spin" /> Deploying Troop...</>
+                                    ) : (
+                                        <>Initiate Full Site Re-Scan <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>
+                                    )}
                                 </button>
                             </div>
                         </div>

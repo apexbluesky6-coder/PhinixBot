@@ -20,6 +20,9 @@ interface AccountLinkerProps {
 export default function AccountLinker({ isOpen, onClose, platform, onSave, existingData }: AccountLinkerProps) {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
+    const [phone, setPhone] = useState("");
+    const [accountId, setAccountId] = useState("");
+    const [accountUrl, setAccountUrl] = useState("");
     const [cookies, setCookies] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [isTesting, setIsTesting] = useState(false);
@@ -29,10 +32,16 @@ export default function AccountLinker({ isOpen, onClose, platform, onSave, exist
         if (existingData) {
             setUsername(existingData.username || "");
             setPassword(existingData.password || "");
+            setPhone(existingData.phone || "");
+            setAccountId(existingData.accountId || "");
+            setAccountUrl(existingData.accountUrl || "");
             setCookies(existingData.cookies || "");
         } else {
             setUsername("");
             setPassword("");
+            setPhone("");
+            setAccountId("");
+            setAccountUrl("");
             setCookies("");
         }
         setTestResult(null);
@@ -41,7 +50,7 @@ export default function AccountLinker({ isOpen, onClose, platform, onSave, exist
     if (!platform) return null;
 
     const handleSave = () => {
-        onSave(platform.url, { username, password, cookies });
+        onSave(platform.url, { username, password, phone, accountId, accountUrl, cookies });
         onClose();
     };
 
@@ -51,10 +60,10 @@ export default function AccountLinker({ isOpen, onClose, platform, onSave, exist
         // Simulate a connection test
         await new Promise(r => setTimeout(r, 2000));
 
-        if (username || cookies) {
-            setTestResult({ success: true, message: "Handshake successful. Troop can reach dashboard." });
+        if (username || cookies || accountUrl) {
+            setTestResult({ success: true, message: "Handshake successful. Troop can reach dashboard and identify account." });
         } else {
-            setTestResult({ success: false, message: "Connection failed. Please provide at least a username or session cookies." });
+            setTestResult({ success: false, message: "Connection failed. Please provide at least a username, account URL, or session cookies." });
         }
         setIsTesting(false);
     };
@@ -108,21 +117,62 @@ export default function AccountLinker({ isOpen, onClose, platform, onSave, exist
                             </div>
 
                             <div className="space-y-6">
-                                {/* Login Info */}
+                                {/* Identification */}
                                 <div className="space-y-4">
                                     <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                                        <Database className="w-4 h-4" /> Credentials
+                                        <Globe className="w-4 h-4" /> Identification
+                                    </h4>
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Specific Account / Dashboard URL</label>
+                                        <input
+                                            type="url"
+                                            value={accountUrl}
+                                            onChange={e => setAccountUrl(e.target.value)}
+                                            placeholder="https://platform.com/my-profile/dashboard"
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all placeholder:text-white/20"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Phone Number (Optional)</label>
+                                            <input
+                                                type="tel"
+                                                value={phone}
+                                                onChange={e => setPhone(e.target.value)}
+                                                placeholder="+1 234..."
+                                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all placeholder:text-white/20"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Account / User ID</label>
+                                            <input
+                                                type="text"
+                                                value={accountId}
+                                                onChange={e => setAccountId(e.target.value)}
+                                                placeholder="ID #12345"
+                                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all placeholder:text-white/20"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Login Info */}
+                                <div className="space-y-4 pt-4 border-t border-white/5">
+                                    <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                        <Database className="w-4 h-4" /> Login Credentials
                                     </h4>
 
                                     <div className="space-y-4">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Username / Email</label>
+                                            <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Email or Username</label>
                                             <input
                                                 type="text"
                                                 value={username}
                                                 onChange={e => setUsername(e.target.value)}
-                                                placeholder="e.g. nathan@example.com"
-                                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all"
+                                                placeholder="nathan@example.com"
+                                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all placeholder:text-white/20"
                                             />
                                         </div>
 

@@ -113,21 +113,32 @@ export default function DashboardPage() {
   const removePlatform = (url: string) => setPlatforms(platforms.filter((p) => p.url !== url));
 
   // === SCOUTING LOGIC ===
-  const deployScoutTroops = async () => {
-    if (platforms.length === 0) return;
+  const deployScoutTroops = async (specificPlatforms?: any[]) => {
+    const targetPlatforms = specificPlatforms || platforms;
+    if (targetPlatforms.length === 0) return;
+
     setIsDeploying(true);
     setDeployError(null);
-    setTroopResults([]);
+    if (!specificPlatforms) setTroopResults([]); // Only clear if full scan
 
     try {
       const res = await fetch("/api/deploy-troops", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ platforms: platforms.map((p) => ({ name: p.name, url: p.url, type: p.type })) }),
+        body: JSON.stringify({ platforms: targetPlatforms.map((p) => ({ name: p.name, url: p.url, type: p.type })) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setTroopResults(data.results || []);
+
+      if (specificPlatforms) {
+        // Merge results if specific
+        setTroopResults(prev => {
+          const others = prev.filter(r => !specificPlatforms.find(sp => sp.name === r.platform));
+          return [...others, ...(data.results || [])];
+        });
+      } else {
+        setTroopResults(data.results || []);
+      }
     } catch (err: any) {
       setDeployError(err.message || "Network error");
     } finally {
@@ -251,6 +262,9 @@ export default function DashboardPage() {
         platform={selectedPlatformDetail}
         linkedData={selectedPlatformDetail ? linkedAccounts[selectedPlatformDetail.url] : null}
         troopLogs={[]} // Future: Fetch from DB/logs
+        onRescan={async () => {
+          await deployScoutTroops([selectedPlatformDetail]);
+        }}
       />
 
       {/* Hero Section */}
@@ -273,7 +287,7 @@ export default function DashboardPage() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               disabled={platforms.length === 0 || isDeploying}
-              onClick={deployScoutTroops}
+              onClick={() => deployScoutTroops()}
               className={cn("glass-card px-8 py-4 flex items-center gap-3 transition-all",
                 platforms.length > 0 ? "bg-blue-600 text-white border-blue-400/50 hover:bg-blue-500" : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed")}
             >
@@ -327,7 +341,7 @@ export default function DashboardPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-4">
-                  <button onClick={deployScoutTroops} disabled={isDeploying} className="text-xs font-bold text-muted-foreground hover:text-white transition-colors">↻ Rescan All</button>
+                  <button onClick={() => deployScoutTroops()} disabled={isDeploying} className="text-xs font-bold text-muted-foreground hover:text-white transition-colors">↻ Rescan All</button>
                 </div>
               </div>
 
