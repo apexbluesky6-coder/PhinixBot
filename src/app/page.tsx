@@ -2,11 +2,9 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Activity, Layers, Zap, Globe, AlertTriangle, Send } from "lucide-react";
-import PlatformCard from "@/components/dashboard/PlatformCard";
+import { Sparkles, Activity, Globe, AlertTriangle, Send, Plus, X, Rocket, ExternalLink } from "lucide-react";
 import TaskQueue from "@/components/dashboard/TaskQueue";
 import AISidePanel from "@/components/dashboard/AISidePanel";
-import ExecutionLogs from "@/components/dashboard/ExecutionLogs";
 import SafetyStatus from "@/components/dashboard/SafetyStatus";
 import IntelligenceGrowth from "@/components/dashboard/IntelligenceGrowth";
 import EarningsTracker from "@/components/dashboard/EarningsTracker";
@@ -21,19 +19,45 @@ const item = {
   show: { y: 0, opacity: 1 }
 };
 
+const SUGGESTED_PLATFORMS = [
+  { name: "We Work Remotely", url: "https://weworkremotely.com", type: "Jobs", icon: "💼" },
+  { name: "Toloka", url: "https://toloka.ai", type: "Microtasks", icon: "⚡" },
+  { name: "Appen", url: "https://connect.appen.com", type: "Microtasks", icon: "🌍" },
+  { name: "Upwork", url: "https://www.upwork.com", type: "Freelance", icon: "🚀" },
+  { name: "LinkedIn Jobs", url: "https://www.linkedin.com/jobs", type: "Jobs", icon: "🔗" },
+  { name: "Indeed Remote", url: "https://www.indeed.com/q-remote-jobs.html", type: "Jobs", icon: "📋" },
+];
+
 export default function DashboardPage() {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [lastApplied, setLastApplied] = useState<string | null>(null);
+  const [platforms, setPlatforms] = useState<{ name: string; url: string; type: string; icon: string }[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newUrl, setNewUrl] = useState("");
+  const [newName, setNewName] = useState("");
 
   const handleSync = () => {
     setIsSyncing(true);
     setTimeout(() => setIsSyncing(false), 2000);
   };
 
-  const handleQuickApply = () => {
-    setLastApplied("Senior React Developer");
-    setTimeout(() => setLastApplied(null), 3000);
+  const addPlatform = (platform: typeof SUGGESTED_PLATFORMS[0]) => {
+    if (!platforms.find(p => p.url === platform.url)) {
+      setPlatforms([...platforms, platform]);
+    }
+  };
+
+  const addCustomPlatform = () => {
+    if (newUrl && newName) {
+      setPlatforms([...platforms, { name: newName, url: newUrl, type: "Custom", icon: "🌐" }]);
+      setNewUrl("");
+      setNewName("");
+      setShowAddForm(false);
+    }
+  };
+
+  const removePlatform = (url: string) => {
+    setPlatforms(platforms.filter(p => p.url !== url));
   };
 
   return (
@@ -61,7 +85,7 @@ export default function DashboardPage() {
               Phinix Fleet Command
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl">
-              <span className="text-white font-bold">Nathan Krop</span> + 1 AI agent operating across ANY website. Morning Routine active.
+              <span className="text-white font-bold">Nathan Krop</span> — Add your target platforms below and start scanning for opportunities.
             </p>
           </div>
 
@@ -69,15 +93,15 @@ export default function DashboardPage() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={handleQuickApply}
-              className="glass-card px-8 py-4 bg-emerald-500 text-white border-emerald-400/50 hover:bg-emerald-400 transition-all flex items-center gap-3 relative"
+              disabled={platforms.length === 0}
+              onClick={handleSync}
+              className={`glass-card px-8 py-4 transition-all flex items-center gap-3 ${platforms.length > 0 ? "bg-emerald-500 text-white border-emerald-400/50 hover:bg-emerald-400" : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed"}`}
             >
-              <Send className="w-4 h-4" />
+              <Rocket className="w-4 h-4" />
               <div className="text-left">
-                <p className="text-[10px] uppercase font-black tracking-tighter opacity-70">Top Match Ready</p>
-                <p className="text-sm font-black">{lastApplied ? "Applied!" : "Quick Apply Now"}</p>
+                <p className="text-[10px] uppercase font-black tracking-tighter opacity-70">{platforms.length} Platform{platforms.length !== 1 ? "s" : ""} Added</p>
+                <p className="text-sm font-black">{isSyncing ? "Scanning..." : "Start Scanning"}</p>
               </div>
-              {lastApplied && <div className="absolute inset-0 bg-emerald-500 flex items-center justify-center rounded-xl animate-in fade-in zoom-in font-bold">Success!</div>}
             </motion.button>
 
             <button
@@ -103,21 +127,94 @@ export default function DashboardPage() {
           <KPIPulse />
           <TaskQueue onSelectTask={setSelectedTask} />
 
+          {/* ===== PLATFORM MANAGER ===== */}
           <section className="space-y-6">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-white/50 italic">
-              <Globe className="w-5 h-5" /> Seed Infrastructure
-            </h2>
-            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <motion.div variants={item}>
-                <PlatformCard name="Toloka" icon={Zap} status="Online" tasksCount={84} avgPay="$0.35" risk="Low" />
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Globe className="w-5 h-5 text-blue-500" /> Target Platforms
+              </h2>
+              <button
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="glass-card px-4 py-2 flex items-center gap-2 bg-blue-600/10 border-blue-500/20 hover:bg-blue-600/20 transition-all text-sm font-bold"
+              >
+                <Plus className="w-4 h-4" /> Add Custom URL
+              </button>
+            </div>
+
+            {/* Custom URL input */}
+            {showAddForm && (
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-6 space-y-4">
+                <h3 className="text-sm font-bold">Add a Custom Platform</h3>
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    placeholder="Platform name (e.g. Freelancer)"
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500/50"
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                  />
+                  <input
+                    type="url"
+                    placeholder="https://www.example.com/jobs"
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500/50"
+                    value={newUrl}
+                    onChange={e => setNewUrl(e.target.value)}
+                  />
+                  <button
+                    onClick={addCustomPlatform}
+                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-sm transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
               </motion.div>
-              <motion.div variants={item}>
-                <PlatformCard name="Appen" icon={Globe} status="Online" tasksCount={12} avgPay="$15.00" risk="Medium" />
+            )}
+
+            {/* Suggested Platforms */}
+            <div>
+              <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-3">Quick Add (Recommended)</p>
+              <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {SUGGESTED_PLATFORMS.map(p => {
+                  const isAdded = platforms.find(pl => pl.url === p.url);
+                  return (
+                    <motion.button
+                      key={p.url}
+                      variants={item}
+                      onClick={() => isAdded ? removePlatform(p.url) : addPlatform(p)}
+                      className={`glass-card p-4 text-left transition-all group ${isAdded ? "border-emerald-500/30 bg-emerald-500/5" : "hover:border-blue-500/30"}`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xl">{p.icon}</span>
+                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${isAdded ? "bg-emerald-500/20 text-emerald-400" : "bg-white/5 text-muted-foreground"}`}>
+                          {isAdded ? "✓ Added" : p.type}
+                        </span>
+                      </div>
+                      <p className="text-sm font-bold">{p.name}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{p.url}</p>
+                    </motion.button>
+                  );
+                })}
               </motion.div>
-              <motion.div variants={item}>
-                <PlatformCard name="Clickworker" icon={Layers} status="Maintenance" tasksCount={0} avgPay="$0.00" risk="Low" className="opacity-40" />
-              </motion.div>
-            </motion.div>
+            </div>
+
+            {/* Active platforms list */}
+            {platforms.length > 0 && (
+              <div className="glass-card p-4 space-y-2">
+                <p className="text-[10px] uppercase tracking-widest font-bold text-emerald-400 mb-2">Active Scan Targets ({platforms.length})</p>
+                {platforms.map(p => (
+                  <div key={p.url} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">{p.icon}</span>
+                      <span className="text-sm font-bold">{p.name}</span>
+                      <a href={p.url} target="_blank" className="text-blue-400 hover:text-blue-300"><ExternalLink className="w-3 h-3" /></a>
+                    </div>
+                    <button onClick={() => removePlatform(p.url)} className="text-muted-foreground hover:text-red-400 transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Escalation */}
@@ -127,7 +224,7 @@ export default function DashboardPage() {
             </h2>
             <div className="glass-card p-6 border-dashed border-amber-500/20 bg-amber-500/5 flex flex-col items-center justify-center gap-3 text-center">
               <p className="text-[11px] text-muted-foreground max-w-xs leading-relaxed">
-                <span className="text-white font-bold">0</span> tasks pending your attention. Universal engine is running autonomously.
+                <span className="text-white font-bold">0</span> tasks pending your attention. Add platforms and scan to populate this queue.
               </p>
             </div>
           </section>
@@ -137,7 +234,6 @@ export default function DashboardPage() {
           <EarningsTracker />
           <IntelligenceGrowth />
           <SafetyStatus />
-          <ExecutionLogs />
         </div>
       </div>
     </div>

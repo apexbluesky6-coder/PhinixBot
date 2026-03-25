@@ -35,8 +35,8 @@ export default function Sidebar({ activeId = "overview", onNavigate }: SidebarPr
           </div>
           <h1 className="text-2xl font-black italic tracking-tighter text-white">PHINIX<span className="text-blue-500">REMO</span></h1>
         </div>
-        <div className="mt-4 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-          <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Active • $12.50/hr</span>
+        <div className="mt-4 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20">
+          <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Ready • Online</span>
         </div>
       </div>
 
