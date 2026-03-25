@@ -5,13 +5,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Activity, Globe, AlertTriangle, Plus, X,
   Rocket, ExternalLink, Loader2, CheckCircle, XCircle,
-  Briefcase, Zap, ChevronDown, ChevronUp
+  Briefcase, Zap, ChevronDown, ChevronUp, MousePointer2,
+  ListChecks, Target, Coins, ShieldCheck
 } from "lucide-react";
 import AISidePanel from "@/components/dashboard/AISidePanel";
 import SafetyStatus from "@/components/dashboard/SafetyStatus";
 import IntelligenceGrowth from "@/components/dashboard/IntelligenceGrowth";
 import EarningsTracker from "@/components/dashboard/EarningsTracker";
 import KPIPulse from "@/components/dashboard/KPIPulse";
+import { cn } from "@/lib/utils";
 
 const container = {
   hidden: { opacity: 0 },
@@ -37,6 +39,7 @@ interface TroopJob {
   pay: string;
   url: string;
   type: string;
+  platform?: string;
 }
 
 interface TroopResult {
@@ -49,6 +52,8 @@ interface TroopResult {
   error?: string;
 }
 
+type JobStatus = "idle" | "working" | "completed" | "failed";
+
 export default function DashboardPage() {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [platforms, setPlatforms] = useState<{ name: string; url: string; type: string; icon: string }[]>([]);
@@ -56,33 +61,24 @@ export default function DashboardPage() {
   const [newUrl, setNewUrl] = useState("");
   const [newName, setNewName] = useState("");
 
-  // Troop state
+  // Scouting State
   const [isDeploying, setIsDeploying] = useState(false);
   const [troopResults, setTroopResults] = useState<TroopResult[]>([]);
   const [expandedTroop, setExpandedTroop] = useState<string | null>(null);
   const [deployError, setDeployError] = useState<string | null>(null);
 
+  // Batch Selection & Work State
+  const [selectedJobUrls, setSelectedJobUrls] = useState<Set<string>>(new Set());
+  const [jobStatuses, setJobStatuses] = useState<Record<string, JobStatus>>({});
+  const [isWorkingAll, setIsWorkingAll] = useState(false);
+
   const addPlatform = (platform: typeof SUGGESTED_PLATFORMS[0]) => {
-    if (!platforms.find((p) => p.url === platform.url)) {
-      setPlatforms([...platforms, platform]);
-    }
+    if (!platforms.find((p) => p.url === platform.url)) setPlatforms([...platforms, platform]);
   };
+  const removePlatform = (url: string) => setPlatforms(platforms.filter((p) => p.url !== url));
 
-  const addCustomPlatform = () => {
-    if (newUrl && newName) {
-      setPlatforms([...platforms, { name: newName, url: newUrl, type: "Custom", icon: "🌐" }]);
-      setNewUrl("");
-      setNewName("");
-      setShowAddForm(false);
-    }
-  };
-
-  const removePlatform = (url: string) => {
-    setPlatforms(platforms.filter((p) => p.url !== url));
-  };
-
-  // === DEPLOY TROOPS ===
-  const deployTroops = async () => {
+  // === SCOUTING LOGIC ===
+  const deployScoutTroops = async () => {
     if (platforms.length === 0) return;
     setIsDeploying(true);
     setDeployError(null);
@@ -92,18 +88,10 @@ export default function DashboardPage() {
       const res = await fetch("/api/deploy-troops", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          platforms: platforms.map((p) => ({ name: p.name, url: p.url, type: p.type })),
-        }),
+        body: JSON.stringify({ platforms: platforms.map((p) => ({ name: p.name, url: p.url, type: p.type })) }),
       });
-
       const data = await res.json();
-
-      if (!res.ok) {
-        setDeployError(data.error || "Deployment failed");
-        return;
-      }
-
+      if (!res.ok) throw new Error(data.error);
       setTroopResults(data.results || []);
     } catch (err: any) {
       setDeployError(err.message || "Network error");
@@ -112,35 +100,73 @@ export default function DashboardPage() {
     }
   };
 
-  const totalJobs = troopResults.reduce((sum, t) => sum + t.jobs.length, 0);
+  // === BATCH WORK LOGIC ===
+  const toggleJobSelection = (e: React.MouseEvent, url: string) => {
+    e.stopPropagation();
+    const newSet = new Set(selectedJobUrls);
+    if (newSet.has(url)) newSet.delete(url); else newSet.add(url);
+    setSelectedJobUrls(newSet);
+  };
+
+  const deployWorkTroops = async () => {
+    if (selectedJobUrls.size === 0) return;
+    setIsWorkingAll(true);
+
+    // Create list of tasks from selection
+    const tasksToWork: TroopJob[] = [];
+    troopResults.forEach(r => {
+      r.jobs.forEach(j => {
+        if (selectedJobUrls.has(j.url)) tasksToWork.push({ ...j, platform: r.platform });
+      });
+    });
+
+    // Mark all selected as working
+    const newStatuses = { ...jobStatuses };
+    tasksToWork.forEach(t => newStatuses[t.url] = "working");
+    setJobStatuses(newStatuses);
+
+    try {
+      const res = await fetch("/api/auto-work", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tasks: tasksToWork })
+      });
+      const data = await res.json();
+
+      // Update statuses based on batch results
+      const updatedStatuses = { ...newStatuses };
+      if (data.results) {
+        data.results.forEach((r: any) => {
+          updatedStatuses[r.jobUrl] = r.status === "completed" ? "completed" : "failed";
+        });
+      }
+      setJobStatuses(updatedStatuses);
+    } catch (err) {
+      console.error("Batch work failed", err);
+    } finally {
+      setIsWorkingAll(false);
+      setSelectedJobUrls(new Set());
+    }
+  };
+
+  const totalResults = troopResults.reduce((sum, t) => sum + t.jobs.length, 0);
 
   return (
     <div className="space-y-12 pb-24">
-      <AISidePanel
-        isOpen={!!selectedTask}
-        onClose={() => setSelectedTask(null)}
-        taskData={selectedTask}
-      />
+      <AISidePanel isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} taskData={selectedTask} />
 
-      {/* Hero */}
+      {/* Hero Section */}
       <section className="space-y-4">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 w-fit"
-        >
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 w-fit">
           <Sparkles className="w-3 h-3 text-blue-400" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400">
-            Universal Core Active (Nathan Krop Profile)
-          </span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Universal Core Active (Nathan Krop Profile)</span>
         </motion.div>
 
         <div className="flex items-end justify-between">
           <div className="space-y-2">
             <h1 className="text-5xl font-bold tracking-tight premium-gradient-text">Phinix Fleet Command</h1>
             <p className="text-muted-foreground text-lg max-w-2xl">
-              <span className="text-white font-bold">Nathan Krop</span> — Add platforms, then deploy your Troops to fetch
-              real opportunities.
+              <span className="text-white font-bold">Nathan Krop</span> — Deploy Troops to fetch real-time tasks, then send multiple workers to execute them simultaneously.
             </p>
           </div>
 
@@ -149,184 +175,116 @@ export default function DashboardPage() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               disabled={platforms.length === 0 || isDeploying}
-              onClick={deployTroops}
-              className={`glass-card px-8 py-4 transition-all flex items-center gap-3 ${platforms.length > 0
-                ? "bg-emerald-500 text-white border-emerald-400/50 hover:bg-emerald-400"
-                : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed"
-                } disabled:opacity-50`}
+              onClick={deployScoutTroops}
+              className={cn("glass-card px-8 py-4 flex items-center gap-3 transition-all",
+                platforms.length > 0 ? "bg-blue-600 text-white border-blue-400/50 hover:bg-blue-500" : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed")}
             >
-              {isDeploying ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Rocket className="w-4 h-4" />
-              )}
+              {isDeploying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
               <div className="text-left">
-                <p className="text-[10px] uppercase font-black tracking-tighter opacity-70">
-                  {platforms.length} Platform{platforms.length !== 1 ? "s" : ""} Targeted
-                </p>
-                <p className="text-sm font-black">
-                  {isDeploying ? "Deploying Troops..." : "Deploy Troops"}
-                </p>
+                <p className="text-[10px] uppercase font-black tracking-tighter opacity-70">Scouting Intelligence</p>
+                <p className="text-sm font-black">{isDeploying ? "Deploying Scouts..." : "Deploy Scouts"}</p>
               </div>
             </motion.button>
 
-            <div className="glass-card px-6 py-4 flex items-center gap-4 bg-blue-600/10 border-blue-500/20">
-              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <Activity className={`text-blue-500 w-5 h-5 ${isDeploying ? "animate-spin" : ""}`} />
-              </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              disabled={selectedJobUrls.size === 0 || isWorkingAll}
+              onClick={deployWorkTroops}
+              className={cn("glass-card px-8 py-4 flex items-center gap-3 transition-all",
+                selectedJobUrls.size > 0 ? "bg-emerald-500 text-white border-emerald-400/50 hover:bg-emerald-400 shadow-xl shadow-emerald-500/20" : "bg-white/5 text-muted-foreground border-white/10 cursor-not-allowed")}
+            >
+              {isWorkingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
               <div className="text-left">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Troops Status</p>
-                <p className="text-lg font-bold">
-                  {isDeploying
-                    ? "Scanning..."
-                    : troopResults.length > 0
-                      ? `${totalJobs} Found`
-                      : "Standby"}
-                </p>
+                <p className="text-[10px] uppercase font-black tracking-tighter opacity-70">Action Phase</p>
+                <p className="text-sm font-black">{isWorkingAll ? "Troops Working..." : selectedJobUrls.size > 0 ? `Deploy ${selectedJobUrls.size} Work Troops` : "No Selection"}</p>
               </div>
-            </div>
+            </motion.button>
           </div>
         </div>
       </section>
 
-      {/* Main Grid */}
+      {/* Stats and Management Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-8 space-y-12">
           <KPIPulse />
 
-          {/* ===== TROOP RESULTS ===== */}
+          {/* ===== TROOP REPORTS ===== */}
           {troopResults.length > 0 && (
             <section className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold flex items-center gap-3">
-                  🪖 Troop Reports
-                  <span className="text-sm font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full">
-                    {totalJobs} opportunities found
-                  </span>
-                </h2>
-                <button
-                  onClick={deployTroops}
-                  disabled={isDeploying}
-                  className="text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50"
-                >
-                  {isDeploying ? "Scanning..." : "↻ Re-scan All"}
-                </button>
+                <div className="flex items-center gap-4">
+                  <h2 className="text-xl font-bold flex items-center gap-3">
+                    🪖 Troop Reports
+                    <span className="text-sm font-bold text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full">{totalResults} found</span>
+                  </h2>
+                  {selectedJobUrls.size > 0 && (
+                    <span className="text-xs font-bold text-emerald-400 animate-pulse flex items-center gap-2">
+                      <MousePointer2 className="w-3 h-3" /> {selectedJobUrls.size} Targeted
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-4">
+                  <button onClick={deployScoutTroops} disabled={isDeploying} className="text-xs font-bold text-muted-foreground hover:text-white transition-colors">↻ Rescan All</button>
+                </div>
               </div>
 
               <div className="space-y-3">
                 {troopResults.map((troop) => (
-                  <motion.div
-                    key={troop.troopId}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="glass-card overflow-hidden"
-                  >
-                    {/* Troop header */}
-                    <button
-                      onClick={() =>
-                        setExpandedTroop(expandedTroop === troop.troopId ? null : troop.troopId)
-                      }
-                      className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
-                    >
+                  <motion.div key={troop.troopId} className="glass-card overflow-hidden border-white/5 hover:border-white/10 transition-colors">
+                    <button onClick={() => setExpandedTroop(expandedTroop === troop.troopId ? null : troop.troopId)} className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
                       <div className="flex items-center gap-4">
-                        <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${troop.status === "found"
-                            ? "bg-emerald-500/10 border border-emerald-500/20"
-                            : troop.status === "error"
-                              ? "bg-red-500/10 border border-red-500/20"
-                              : "bg-blue-500/10 border border-blue-500/20"
-                            }`}
-                        >
-                          {troop.status === "found" ? (
-                            <CheckCircle className="w-5 h-5 text-emerald-400" />
-                          ) : troop.status === "error" ? (
-                            <XCircle className="w-5 h-5 text-red-400" />
-                          ) : (
-                            <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-                          )}
+                        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-lg",
+                          troop.status === "error" ? "bg-red-500/10 border-red-500/20 text-red-400" : "bg-blue-500/10 border-blue-500/20 text-blue-400")}>
+                          {troop.status === "found" ? <ListChecks className="w-5 h-5" /> : troop.status === "error" ? <XCircle className="w-5 h-5" /> : <Loader2 className="w-5 h-5 animate-spin" />}
                         </div>
                         <div className="text-left">
                           <p className="font-bold text-sm">{troop.platform}</p>
                           <p className="text-[10px] text-muted-foreground font-mono">{troop.troopId}</p>
                         </div>
                       </div>
-
                       <div className="flex items-center gap-4">
-                        <span
-                          className={`text-xs font-bold px-2 py-1 rounded-full ${troop.status === "found"
-                            ? "bg-emerald-500/20 text-emerald-400"
-                            : troop.status === "error"
-                              ? "bg-red-500/20 text-red-400"
-                              : "bg-blue-500/20 text-blue-400"
-                            }`}
-                        >
-                          {troop.status === "found"
-                            ? `${troop.jobs.length} jobs`
-                            : troop.status === "error"
-                              ? "Failed"
-                              : "Scouting"}
+                        <span className={cn("text-xs font-bold px-2 py-1 rounded-full", troop.status === "found" ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400")}>
+                          {troop.status === "found" ? `${troop.jobs.length} scouts active` : "Failed"}
                         </span>
-                        {expandedTroop === troop.troopId ? (
-                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                        )}
+                        {expandedTroop === troop.troopId ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </div>
                     </button>
 
-                    {/* Expanded job list */}
                     <AnimatePresence>
                       {expandedTroop === troop.troopId && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="border-t border-white/5"
-                        >
-                          {troop.error && (
-                            <p className="p-4 text-sm text-red-400">{troop.error}</p>
-                          )}
-                          {troop.jobs.length === 0 && !troop.error && (
-                            <p className="p-4 text-sm text-muted-foreground italic">
-                              No clear job listings found. The page may require login or has a non-standard layout.
-                            </p>
-                          )}
-                          {troop.jobs.map((job, ji) => (
-                            <div
-                              key={ji}
-                              onClick={() => setSelectedTask({ ...job, id: `TRP-${ji}`, platform: troop.platform })}
-                              className="flex items-center justify-between p-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors cursor-pointer group/job"
-                            >
-                              <div className="flex items-center gap-4">
-                                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover/job:bg-blue-500/20 transition-all">
-                                  {job.type === "Microtask" ? (
-                                    <Zap className="w-4 h-4 text-emerald-400" />
-                                  ) : (
-                                    <Briefcase className="w-4 h-4 text-blue-400" />
-                                  )}
+                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-t border-white/5">
+                          {troop.jobs.map((job, ji) => {
+                            const jobStatus = jobStatuses[job.url] || "idle";
+                            const isSelected = selectedJobUrls.has(job.url);
+                            return (
+                              <div key={ji} onClick={() => setSelectedTask({ ...job, id: `TRP-${ji}`, platform: troop.platform })} className="flex items-center justify-between p-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors cursor-pointer group/job relative overflow-hidden">
+                                {/* Progress Bar for 'Working' status */}
+                                {jobStatus === "working" && <motion.div initial={{ width: 0 }} animate={{ width: "100%" }} transition={{ duration: 60, ease: "linear" }} className="absolute bottom-0 left-0 h-0.5 bg-blue-500" />}
+
+                                <div className="flex items-center gap-4 relative z-10">
+                                  <button onClick={(e) => toggleJobSelection(e, job.url)} className={cn("w-5 h-5 rounded border flex items-center justify-center transition-all",
+                                    isSelected ? "bg-blue-600 border-blue-500" : "border-white/20 hover:border-white/40")}>
+                                    {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
+                                  </button>
+                                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+                                    {jobStatus === "working" ? <Loader2 className="w-4 h-4 text-blue-400 animate-spin" /> :
+                                      jobStatus === "completed" ? <CheckCircle className="w-4 h-4 text-emerald-400" /> :
+                                        jobStatus === "failed" ? <XCircle className="w-4 h-4 text-red-400" /> :
+                                          <Target className="w-4 h-4 text-white/20 group-hover/job:text-blue-400 transition-colors" />}
+                                  </div>
+                                  <div>
+                                    <p className={cn("text-xs font-bold transition-colors", jobStatus === "completed" ? "text-emerald-400" : jobStatus === "failed" ? "text-red-400" : "text-white group-hover/job:text-blue-400")}>{job.title}</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-tight">{job.company}</p>
+                                  </div>
                                 </div>
-                                <div>
-                                  <p className="text-sm font-bold text-white group-hover/job:text-blue-400 transition-colors">{job.title}</p>
-                                  <p className="text-xs text-muted-foreground">{job.company}</p>
+                                <div className="flex items-center gap-6 relative z-10">
+                                  <span className="text-xs font-bold text-blue-400">{job.pay}</span>
+                                  <a href={job.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-white/20 hover:text-white transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-6">
-                                <span className="text-sm font-bold text-emerald-400">{job.pay}</span>
-                                <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">
-                                  {job.type}
-                                </span>
-                                <a
-                                  href={job.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-blue-400 hover:text-blue-300"
-                                >
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                                </a>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -336,190 +294,68 @@ export default function DashboardPage() {
             </section>
           )}
 
-          {/* Error display */}
-          {deployError && (
-            <div className="glass-card p-4 border-red-500/30 bg-red-500/5 text-red-400 text-sm font-bold">
-              ❌ Deployment Error: {deployError}
-            </div>
-          )}
-
-          {/* Task Queue (empty state when no results) */}
-          {troopResults.length === 0 && !isDeploying && (
-            <div className="glass-card p-12 flex flex-col items-center justify-center gap-4 text-center border-dashed border-white/10">
-              <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                <Globe className="w-8 h-8 text-blue-400" />
-              </div>
-              <h3 className="text-lg font-bold text-white">No Tasks Yet</h3>
-              <p className="text-sm text-muted-foreground max-w-md">
-                Add platforms below, then click{" "}
-                <span className="text-emerald-400 font-bold">&quot;Deploy Troops&quot;</span> to send your AI
-                workers to fetch real jobs and tasks.
-              </p>
-            </div>
-          )}
-
-          {/* Loading animation */}
-          {isDeploying && (
-            <div className="glass-card p-12 flex flex-col items-center justify-center gap-6 text-center">
-              <div className="relative">
-                <div className="w-20 h-20 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin" />
-                <div className="absolute inset-0 flex items-center justify-center text-2xl">🪖</div>
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Troops Deployed!</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {platforms.length} troops are simultaneously scanning {platforms.length} websites...
-                </p>
-              </div>
-              <div className="flex flex-wrap justify-center gap-2 max-w-md">
-                {platforms.map((p) => (
-                  <span
-                    key={p.url}
-                    className="text-[10px] font-bold px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 animate-pulse"
-                  >
-                    {p.icon} {p.name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* ===== PLATFORM MANAGER ===== */}
           <section className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <Globe className="w-5 h-5 text-blue-500" /> Target Platforms
+            <div className="flex items-center justify-between border-b border-white/5 pb-4">
+              <h2 className="text-xl font-bold flex items-center gap-2 px-1">
+                <Globe className="w-5 h-5 text-blue-500" /> Deployment Bases
               </h2>
-              <button
-                onClick={() => setShowAddForm(!showAddForm)}
-                className="glass-card px-4 py-2 flex items-center gap-2 bg-blue-600/10 border-blue-500/20 hover:bg-blue-600/20 transition-all text-sm font-bold"
-              >
-                <Plus className="w-4 h-4" /> Add Custom URL
+              <button onClick={() => setShowAddForm(!showAddForm)} className="glass-card px-4 py-2 flex items-center gap-2 bg-blue-600/10 border-blue-500/20 hover:bg-blue-600/20 transition-all text-sm font-bold">
+                <Plus className="w-4 h-4" /> Add Custom
               </button>
             </div>
 
             {showAddForm && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="glass-card p-6 space-y-4"
-              >
-                <h3 className="text-sm font-bold">Add a Custom Platform</h3>
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    placeholder="Platform name (e.g. RemoteOK)"
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500/50"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                  />
-                  <input
-                    type="url"
-                    placeholder="https://www.example.com/jobs"
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500/50"
-                    value={newUrl}
-                    onChange={(e) => setNewUrl(e.target.value)}
-                  />
-                  <button
-                    onClick={addCustomPlatform}
-                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-sm transition-colors"
-                  >
-                    Add
-                  </button>
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card p-6 border-blue-500/20">
+                <div className="flex gap-4">
+                  <input value={newName} onChange={e => setNewName(e.target.value)} type="text" placeholder="Base Name (e.g. RemoteOK)" className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500" />
+                  <input value={newUrl} onChange={e => setNewUrl(e.target.value)} type="url" placeholder="https://..." className="flex-2 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500" />
+                  <button onClick={() => { if (newName && newUrl) { setPlatforms([...platforms, { name: newName, url: newUrl, type: "Custom", icon: "🌐" }]); setNewUrl(""); setNewName(""); setShowAddForm(false); } }} className="bg-blue-600 px-6 py-2 rounded-lg font-bold">Add Base</button>
                 </div>
               </motion.div>
             )}
 
-            {/* Suggested Platforms */}
-            <div>
-              <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-3">
-                Quick Add (Recommended)
-              </p>
-              <motion.div
-                variants={container}
-                initial="hidden"
-                animate="show"
-                className="grid grid-cols-2 md:grid-cols-3 gap-3"
-              >
-                {SUGGESTED_PLATFORMS.map((p) => {
-                  const isAdded = platforms.find((pl) => pl.url === p.url);
-                  return (
-                    <motion.button
-                      key={p.url}
-                      variants={item}
-                      onClick={() => (isAdded ? removePlatform(p.url) : addPlatform(p))}
-                      className={`glass-card p-4 text-left transition-all group ${isAdded ? "border-emerald-500/30 bg-emerald-500/5" : "hover:border-blue-500/30"
-                        }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xl">{p.icon}</span>
-                        <span
-                          className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${isAdded
-                            ? "bg-emerald-500/20 text-emerald-400"
-                            : "bg-white/5 text-muted-foreground"
-                            }`}
-                        >
-                          {isAdded ? "✓ Added" : p.type}
-                        </span>
-                      </div>
-                      <p className="text-sm font-bold">{p.name}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{p.url}</p>
-                    </motion.button>
-                  );
-                })}
-              </motion.div>
-            </div>
-
-            {/* Active platforms list */}
-            {platforms.length > 0 && (
-              <div className="glass-card p-4 space-y-2">
-                <p className="text-[10px] uppercase tracking-widest font-bold text-emerald-400 mb-2">
-                  Active Scan Targets ({platforms.length})
-                </p>
-                {platforms.map((p) => (
-                  <div
-                    key={p.url}
-                    className="flex items-center justify-between py-2 border-b border-white/5 last:border-0"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">{p.icon}</span>
-                      <span className="text-sm font-bold">{p.name}</span>
-                      <a
-                        href={p.url}
-                        target="_blank"
-                        className="text-blue-400 hover:text-blue-300"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
+            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {SUGGESTED_PLATFORMS.map(p => {
+                const isAdded = platforms.find(pl => pl.url === p.url);
+                return (
+                  <motion.button key={p.url} variants={item} onClick={() => isAdded ? removePlatform(p.url) : addPlatform(p)}
+                    className={cn("glass-card p-4 text-left transition-all relative group", isAdded ? "border-emerald-500/30 bg-emerald-500/5 shadow-lg shadow-emerald-500/5" : "hover:border-blue-500/30")}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xl">{p.icon}</span>
+                      {isAdded && <CheckCircle className="w-4 h-4 text-emerald-400" />}
                     </div>
-                    <button
-                      onClick={() => removePlatform(p.url)}
-                      className="text-muted-foreground hover:text-red-400 transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* Escalation */}
-          <section className="space-y-4">
-            <h2 className="text-lg font-bold flex items-center gap-2 text-amber-500">
-              <AlertTriangle className="w-4 h-4" /> Priority Escalations
-            </h2>
-            <div className="glass-card p-6 border-dashed border-amber-500/20 bg-amber-500/5 flex flex-col items-center justify-center gap-3 text-center">
-              <p className="text-[11px] text-muted-foreground max-w-xs leading-relaxed">
-                <span className="text-white font-bold">0</span> tasks pending your attention. Deploy troops to
-                populate this queue.
-              </p>
-            </div>
+                    <p className="text-sm font-bold">{p.name}</p>
+                    <p className="text-[10px] text-muted-foreground truncate opacity-50">{p.url}</p>
+                  </motion.button>
+                );
+              })}
+            </motion.div>
           </section>
         </div>
 
         <div className="lg:col-span-4 space-y-8">
           <EarningsTracker />
+          <div className="p-6 glass-card space-y-6">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" /> Defensive Guard
+            </h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-white/70">Stealth Mode</p>
+                <div className="w-8 h-4 bg-emerald-500/20 rounded-full flex items-center px-0.5 border border-emerald-500/30">
+                  <div className="w-3 h-3 bg-emerald-400 rounded-full" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-white/70">Human Mimicry</p>
+                <span className="text-[10px] font-bold text-emerald-400">7-15s delay</span>
+              </div>
+              <div className="text-[11px] text-muted-foreground italic bg-black/20 p-3 rounded-lg border border-white/5">
+                "Defensive protocols active. Each troop operates with an unique IP and interaction pattern."
+              </div>
+            </div>
+          </div>
           <IntelligenceGrowth />
           <SafetyStatus />
         </div>
