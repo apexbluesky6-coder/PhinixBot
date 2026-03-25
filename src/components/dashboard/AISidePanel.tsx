@@ -13,9 +13,10 @@ interface AISidePanelProps {
     isOpen: boolean;
     onClose: () => void;
     taskData: any;
+    credentials?: any; // New: Pass platform credentials
 }
 
-export default function AISidePanel({ isOpen, onClose, taskData }: AISidePanelProps) {
+export default function AISidePanel({ isOpen, onClose, taskData, credentials }: AISidePanelProps) {
     const [isExecuting, setIsExecuting] = useState(false);
     const [executionResult, setExecutionResult] = useState<any>(null);
     const [score, setScore] = useState(0);
@@ -49,7 +50,8 @@ export default function AISidePanel({ isOpen, onClose, taskData }: AISidePanelPr
                     platform: taskData.platform || taskData.company,
                     url: taskData.url,
                     title: taskData.title,
-                    profileId: isJob ? "JOB_SEEKER_1" : "MICROTASK_WORKER_1"
+                    profileId: isJob ? "JOB_SEEKER_1" : "MICROTASK_WORKER_1",
+                    credentials: credentials // New: Pass credentials to API
                 })
             });
             const data = await res.json();

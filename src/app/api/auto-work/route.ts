@@ -6,7 +6,7 @@ export const maxDuration = 300; // Allow 5 mins for batch work
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { tasks } = body;
+        const { tasks, linkedAccounts } = body;
 
         if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
             return NextResponse.json({ error: "No tasks provided" }, { status: 400 });
@@ -14,8 +14,14 @@ export async function POST(request: NextRequest) {
 
         console.log(`🤖 Commander deploying Batch Work for ${tasks.length} tasks...`);
 
+        // Map credentials to each task if available
+        const tasksWithCreds = tasks.map((t: any) => ({
+            ...t,
+            credentials: linkedAccounts ? linkedAccounts[t.platformUrl || t.url] : null
+        }));
+
         // Trigger batch execution
-        const results = await troopCommander.deployWorkTroops(tasks);
+        const results = await troopCommander.deployWorkTroops(tasksWithCreds);
 
         const succeeded = results.filter(r => r.status === "completed").length;
 

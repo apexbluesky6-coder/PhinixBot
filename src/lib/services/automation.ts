@@ -4,13 +4,28 @@ import { z } from "zod";
 export class PhinixAutomation {
     private stagehand: Stagehand | null = null;
 
-    async init() {
+    async init(options?: { cookies?: any; credentials?: any }) {
         this.stagehand = new Stagehand({
             env: "LOCAL",
             apiKey: process.env.BROWSERBASE_API_KEY,
             projectId: process.env.BROWSERBASE_PROJECT_ID,
         });
+
         await this.stagehand.init();
+
+        if (options?.cookies && this.stagehand) {
+            try {
+                // @ts-ignore - Accessing underlying Playwright Page from Stagehand
+                const page = (this.stagehand as any).page;
+                const cookieArray = typeof options.cookies === 'string' ? JSON.parse(options.cookies) : options.cookies;
+                if (Array.isArray(cookieArray)) {
+                    console.log(`--- [Stealth] Injecting ${cookieArray.length} session cookies ---`);
+                    await page.context().addCookies(cookieArray);
+                }
+            } catch (e) {
+                console.warn("Failed to parse or inject cookies:", e);
+            }
+        }
     }
 
     // Stealth Delay helper: Simulates human variation
@@ -37,18 +52,26 @@ export class PhinixAutomation {
     }
 
     async login(platform: string, credentials: any) {
-        if (!this.stagehand) await this.init();
+        if (!this.stagehand) await this.init({ credentials });
         const page = await this.stagehand!.context.awaitActivePage();
 
         console.log(`--- Logging into ${platform} (Stealth Mode) ---`);
-        await page.goto(platform === 'Toloka' ? 'https://toloka.ai/tasker/' : 'https://connect.appen.com/');
+        const loginUrl = platform === 'Toloka' ? 'https://toloka.ai/tasker/' :
+            platform === 'Upwork' ? 'https://www.upwork.com/ab/account-security/login' :
+                'https://connect.appen.com/';
 
-        await this.humanWait(3000, 6000); // Wait for page load naturally
+        await page.goto(loginUrl);
+        await this.humanWait(3000, 6000);
 
         // Natural language automation with Stagehand 'act'
-        await this.stagehand!.act(`Click on the login button and enter credentials: ${credentials.email}`);
-        await this.humanWait(1500, 3500);
-        await this.stagehand!.act(`Enter password and click Submit`);
+        if (credentials.username || credentials.email) {
+            await this.stagehand!.act(`Enter username/email: ${credentials.username || credentials.email}`);
+            await this.humanWait(1500, 3000);
+            if (credentials.password) {
+                await this.stagehand!.act(`Enter password and click the primary login/submit button`);
+                await this.humanWait(3000, 5000);
+            }
+        }
 
         return page;
     }

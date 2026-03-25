@@ -6,7 +6,7 @@ export const maxDuration = 300; // Allow up to 5 minutes for Stagehand execution
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { platform, url, title, profileId } = body;
+        const { platform, url, title, profileId, credentials } = body;
 
         console.log(`🤖 Deploying AI Worker to execute task on ${platform}: ${title}`);
 
@@ -18,7 +18,10 @@ export async function POST(request: NextRequest) {
 
         // Initialize Stagehand
         const automation = new PhinixAutomation();
-        await automation.init();
+        await automation.init({
+            cookies: credentials?.cookies,
+            credentials
+        });
 
         try {
             // Execute the task

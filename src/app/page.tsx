@@ -6,9 +6,10 @@ import {
   Sparkles, Activity, Globe, AlertTriangle, Plus, X,
   Rocket, ExternalLink, Loader2, CheckCircle, XCircle,
   Briefcase, Zap, ChevronDown, ChevronUp, MousePointer2,
-  ListChecks, Target, Coins, ShieldCheck
+  ListChecks, Target, Coins, ShieldCheck, Lock
 } from "lucide-react";
 import AISidePanel from "@/components/dashboard/AISidePanel";
+import AccountLinker from "@/components/dashboard/AccountLinker";
 import SafetyStatus from "@/components/dashboard/SafetyStatus";
 import IntelligenceGrowth from "@/components/dashboard/IntelligenceGrowth";
 import EarningsTracker from "@/components/dashboard/EarningsTracker";
@@ -72,6 +73,10 @@ export default function DashboardPage() {
   const [jobStatuses, setJobStatuses] = useState<Record<string, JobStatus>>({});
   const [isWorkingAll, setIsWorkingAll] = useState(false);
 
+  // Account Linking State
+  const [linkedAccounts, setLinkedAccounts] = useState<Record<string, any>>({});
+  const [platformToLink, setPlatformToLink] = useState<any>(null);
+
   const addPlatform = (platform: typeof SUGGESTED_PLATFORMS[0]) => {
     if (!platforms.find((p) => p.url === platform.url)) setPlatforms([...platforms, platform]);
   };
@@ -129,7 +134,7 @@ export default function DashboardPage() {
       const res = await fetch("/api/auto-work", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tasks: tasksToWork })
+        body: JSON.stringify({ tasks: tasksToWork, linkedAccounts })
       });
       const data = await res.json();
 
@@ -153,7 +158,20 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-12 pb-24">
-      <AISidePanel isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} taskData={selectedTask} />
+      <AISidePanel
+        isOpen={!!selectedTask}
+        onClose={() => setSelectedTask(null)}
+        taskData={selectedTask}
+        credentials={selectedTask ? linkedAccounts[selectedTask.platformUrl] : null}
+      />
+
+      <AccountLinker
+        isOpen={!!platformToLink}
+        onClose={() => setPlatformToLink(null)}
+        platform={platformToLink}
+        existingData={platformToLink ? linkedAccounts[platformToLink.url] : null}
+        onSave={(url, data) => setLinkedAccounts({ ...linkedAccounts, [url]: data })}
+      />
 
       {/* Hero Section */}
       <section className="space-y-4">
@@ -258,7 +276,7 @@ export default function DashboardPage() {
                             const jobStatus = jobStatuses[job.url] || "idle";
                             const isSelected = selectedJobUrls.has(job.url);
                             return (
-                              <div key={ji} onClick={() => setSelectedTask({ ...job, id: `TRP-${ji}`, platform: troop.platform })} className="flex items-center justify-between p-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors cursor-pointer group/job relative overflow-hidden">
+                              <div key={ji} onClick={() => setSelectedTask({ ...job, id: `TRP-${ji}`, platform: troop.platform, platformUrl: troop.url })} className="flex items-center justify-between p-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors cursor-pointer group/job relative overflow-hidden">
                                 {/* Progress Bar for 'Working' status */}
                                 {jobStatus === "working" && <motion.div initial={{ width: 0 }} animate={{ width: "100%" }} transition={{ duration: 60, ease: "linear" }} className="absolute bottom-0 left-0 h-0.5 bg-blue-500" />}
 
@@ -318,16 +336,35 @@ export default function DashboardPage() {
             <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {SUGGESTED_PLATFORMS.map(p => {
                 const isAdded = platforms.find(pl => pl.url === p.url);
+                const isLinked = linkedAccounts[p.url];
                 return (
-                  <motion.button key={p.url} variants={item} onClick={() => isAdded ? removePlatform(p.url) : addPlatform(p)}
-                    className={cn("glass-card p-4 text-left transition-all relative group", isAdded ? "border-emerald-500/30 bg-emerald-500/5 shadow-lg shadow-emerald-500/5" : "hover:border-blue-500/30")}>
+                  <motion.div key={p.url} variants={item}
+                    className={cn("glass-card p-4 text-left transition-all relative group flex flex-col", isAdded ? "border-emerald-500/30 bg-emerald-500/5 shadow-lg shadow-emerald-500/5" : "hover:border-blue-500/30")}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xl">{p.icon}</span>
-                      {isAdded && <CheckCircle className="w-4 h-4 text-emerald-400" />}
+                      <div className="flex items-center gap-2">
+                        {isAdded && <CheckCircle className="w-4 h-4 text-emerald-400" />}
+                        {isAdded && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setPlatformToLink(p); }}
+                            className={cn("p-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 transition-all", isLinked ? "text-emerald-400" : "text-muted-foreground")}
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <p className="text-sm font-bold">{p.name}</p>
-                    <p className="text-[10px] text-muted-foreground truncate opacity-50">{p.url}</p>
-                  </motion.button>
+                    <p className="text-[10px] text-muted-foreground truncate opacity-50 mb-4">{p.url}</p>
+
+                    <button
+                      onClick={() => isAdded ? removePlatform(p.url) : addPlatform(p)}
+                      className={cn("w-full py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all",
+                        isAdded ? "bg-white/5 border-white/10 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400" : "bg-blue-600 border-blue-400/50 hover:bg-blue-500")}
+                    >
+                      {isAdded ? "Remove Base" : "Add Base"}
+                    </button>
+                  </motion.div>
                 );
               })}
             </motion.div>

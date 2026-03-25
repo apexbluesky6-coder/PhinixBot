@@ -6,6 +6,7 @@ export interface WorkTask {
     title: string;
     type: string;
     company: string;
+    credentials?: any; // New: Supports login info & cookies
 }
 
 export interface WorkResult {
@@ -52,7 +53,12 @@ export class TroopCommander {
 
         try {
             console.log(`🚀 [Troop] Starting work on: ${task.title} (${task.platform})`);
-            await automation.init();
+
+            // Initialize with credentials and cookies if available
+            await automation.init({
+                cookies: task.credentials?.cookies,
+                credentials: task.credentials
+            });
 
             const profileType = task.type === "Microtask" ? "MICROTASK_WORKER_1" : "JOB_SEEKER_1";
             const suggestion = `Perform the application or task for "${task.title}". Use ${profileType} profile data. Focus on submission.`;
