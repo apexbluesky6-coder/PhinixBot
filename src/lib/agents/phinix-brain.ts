@@ -2,88 +2,124 @@ import { StateGraph, START, END } from "@langchain/langgraph";
 import fs from 'fs';
 import path from 'path';
 
-// Define the state interface
+// Define the expanded state for Universal Job + Microtask support
 interface AgentState {
-    taskId?: string;
-    rawData?: string;
-    instructions?: string[];
+    id?: string;
+    url?: string;
+    mode: "scout" | "analyze_form" | "generate_answers" | "full_run";
+    profileId: "JOB_SEEKER_1" | "MICROTASK_WORKER_1";
+
+    // Phase 1: Discovery
+    rawListings?: any[];
+    topQueue?: any[];
+
+    // Phase 2: Analysis
+    formData?: any;
+    screenQs?: any;
+
+    // Intelligence Metrics
     confidence: number;
     riskTier: number;
-    suggestion?: string;
-    isEscalated: boolean;
-    actionTaken?: "AUTO_SUBMITTED" | "ESCALATED_TO_HUMAN";
+    matchScore: number;
+
+    // Status
+    actionTaken?: "AUTO_SUBMITTED" | "READY_FOR_HUMAN" | "ESCALATED_GUARDRAIL";
     feedback?: string;
+    summary?: string;
 }
 
-// 1. Planner Node: Analyzes the task type
-const planner = async (state: AgentState): Promise<Partial<AgentState>> => {
-    const isHighRisk = state.rawData?.toLowerCase().includes("trap") || state.rawData?.toLowerCase().includes("broken");
-    return {
-        riskTier: isHighRisk ? 3 : 1,
-        confidence: isHighRisk ? 0.4 : 0.92
-    };
-};
+/**
+ * PHASE 1: DISCOVERY (Scouting)
+ * Analyzes platform listings and scores them against the profile.
+ */
+const discoveryNode = async (state: AgentState): Promise<Partial<AgentState>> => {
+    if (state.mode !== "scout" && state.mode !== "full_run") return {};
 
-// 2. Explainer Node: Simplifies instructions
-const explainer = async (state: AgentState): Promise<Partial<AgentState>> => {
+    console.log(`--- PHASE 1: Scouting ${state.url} ---`);
+    // Mock scoring logic based on the new Master Prompt rubrics
+    const matchScore = 85; // Example
     return {
-        instructions: [
-            "Analyze image density",
-            state.riskTier === 3 ? "WARNING: Potential Attention Check detected" : "Standard classification"
-        ]
-    };
-};
-
-// 3. Executor Node: Decides if it can auto-submit
-const executor = async (state: AgentState): Promise<Partial<AgentState>> => {
-    const canAutoSubmit = state.confidence > 0.9 && state.riskTier === 1;
-    return {
-        suggestion: "Label: URBAN",
-        isEscalated: !canAutoSubmit,
-        actionTaken: canAutoSubmit ? "AUTO_SUBMITTED" : "ESCALATED_TO_HUMAN"
+        matchScore,
+        summary: `Found listings on ${state.url}. Match score: ${matchScore}`,
+        topQueue: [{ id: state.id || "job_001", title: "Remote Developer", score: matchScore }]
     };
 };
 
 /**
- * 4. REINFORCEMENT NODE: Progressive Learning Logic
- * Collects "Human Feedback" or Successful Outcomes and saves them as Local Knowledge.
+ * PHASE 2: FORM ANALYSIS & AUTO-FILL
+ * Detects form fields and generates smart answers using the profile.
  */
-const reinforcement = async (state: AgentState): Promise<Partial<AgentState>> => {
-    if (state.feedback) {
-        console.log("--- REINFORCEMENT: Learning from human correction... ---");
-        const correctionPath = path.join(process.cwd(), 'knowledge/corrections', `${Date.now()}_correction.md`);
-        const content = `# Automated Learning Log\n**Task**: ${state.taskId}\n**Correction**: ${state.feedback}\n**Date**: ${new Date().toISOString()}`;
+const analysisNode = async (state: AgentState): Promise<Partial<AgentState>> => {
+    if (state.mode === "scout") return {};
 
-        // In a production app, we would append to a RAG index here.
-        // For now, we seed the /knowledge/corrections folder.
+    console.log("--- PHASE 2: Analyzing Form Fields ---");
+    const hasCaptcha = false; // Mock check
+
+    return {
+        riskTier: hasCaptcha ? 3 : 1,
+        confidence: hasCaptcha ? 0.4 : 0.95,
+        formData: {
+            coverLetter: "Highly interested in this React role...",
+            experience: "2+ years of professional automation."
+        }
+    };
+};
+
+/**
+ * PHASE 3: EXECUTION DECISION
+ * Determines if the package is ready for human review or auto-submission.
+ */
+const executionNode = async (state: AgentState): Promise<Partial<AgentState>> => {
+    const isSafe = state.confidence > 0.9 && state.riskTier < 2;
+
+    return {
+        actionTaken: isSafe ? "READY_FOR_HUMAN" : "ESCALATED_GUARDRAIL",
+        summary: isSafe
+            ? "Application package prepared and ready for final human approval."
+            : "High risk or low confidence detected. Flagged for manual review."
+    };
+};
+
+/**
+ * REINFORCEMENT: Learning Loop
+ */
+const reinforcementNode = async (state: AgentState): Promise<Partial<AgentState>> => {
+    if (state.feedback) {
+        const correctionPath = path.join(process.cwd(), 'knowledge/corrections', `${Date.now()}_job_learning.md`);
+        const content = `# Job Learning Log\n**Task**: ${state.id}\n**Correction**: ${state.feedback}`;
         fs.mkdirSync(path.dirname(correctionPath), { recursive: true });
         fs.writeFileSync(correctionPath, content);
     }
     return {};
 };
 
-// Build the graph
+// Build the Universal JobPilot Graph
 const workflow = new StateGraph<AgentState>({
     channels: {
-        taskId: null,
-        rawData: null,
-        instructions: null,
+        id: null,
+        url: null,
+        mode: null,
+        profileId: null,
+        rawListings: null,
+        topQueue: null,
+        formData: null,
+        screenQs: null,
         confidence: null,
         riskTier: null,
-        suggestion: null,
-        isEscalated: null,
+        matchScore: null,
         actionTaken: null,
         feedback: null,
+        summary: null,
     }
 })
-    .addNode("planner", planner)
-    .addNode("explainer", explainer)
-    .addNode("executor", executor)
-    .addNode("reinforcement", reinforcement)
-    .addEdge(START, "planner")
-    .addEdge("planner", "explainer")
-    .addEdge("explainer", "executor")
-    .addEdge("executor", "reinforcement") // Learning happens after every decision
+    .addNode("discovery", discoveryNode)
+    .addNode("analysis", analysisNode)
+    .addNode("execution", executionNode)
+    .addNode("reinforcement", reinforcementNode)
+    .addEdge(START, "discovery")
+    .addEdge("discovery", "analysis")
+    .addEdge("analysis", "execution")
+    .addEdge("execution", "reinforcement")
     .addEdge("reinforcement", END);
 
 export const phinixBrain = workflow.compile();
