@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Activity, Globe, AlertTriangle, Plus, X,
@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import AISidePanel from "@/components/dashboard/AISidePanel";
 import AccountLinker from "@/components/dashboard/AccountLinker";
+import PlatformDetailsPanel from "@/components/dashboard/PlatformDetailsPanel";
 import SafetyStatus from "@/components/dashboard/SafetyStatus";
 import IntelligenceGrowth from "@/components/dashboard/IntelligenceGrowth";
 import EarningsTracker from "@/components/dashboard/EarningsTracker";
@@ -76,6 +77,20 @@ export default function DashboardPage() {
   // Account Linking State
   const [linkedAccounts, setLinkedAccounts] = useState<Record<string, any>>({});
   const [platformToLink, setPlatformToLink] = useState<any>(null);
+  const [selectedPlatformDetail, setSelectedPlatformDetail] = useState<any>(null);
+
+  // Persistence Logic
+  useEffect(() => {
+    const savedPlatforms = localStorage.getItem("phinix_platforms");
+    const savedAccounts = localStorage.getItem("phinix_accounts");
+    if (savedPlatforms) setPlatforms(JSON.parse(savedPlatforms));
+    if (savedAccounts) setLinkedAccounts(JSON.parse(savedAccounts));
+  }, []);
+
+  useEffect(() => {
+    if (platforms.length > 0) localStorage.setItem("phinix_platforms", JSON.stringify(platforms));
+    localStorage.setItem("phinix_accounts", JSON.stringify(linkedAccounts));
+  }, [platforms, linkedAccounts]);
 
   const addPlatform = (platform: typeof SUGGESTED_PLATFORMS[0]) => {
     if (!platforms.find((p) => p.url === platform.url)) setPlatforms([...platforms, platform]);
@@ -171,6 +186,14 @@ export default function DashboardPage() {
         platform={platformToLink}
         existingData={platformToLink ? linkedAccounts[platformToLink.url] : null}
         onSave={(url, data) => setLinkedAccounts({ ...linkedAccounts, [url]: data })}
+      />
+
+      <PlatformDetailsPanel
+        isOpen={!!selectedPlatformDetail}
+        onClose={() => setSelectedPlatformDetail(null)}
+        platform={selectedPlatformDetail}
+        linkedData={selectedPlatformDetail ? linkedAccounts[selectedPlatformDetail.url] : null}
+        troopLogs={[]} // Future: Fetch from DB/logs
       />
 
       {/* Hero Section */}
@@ -337,32 +360,39 @@ export default function DashboardPage() {
               {SUGGESTED_PLATFORMS.map(p => {
                 const isAdded = platforms.find(pl => pl.url === p.url);
                 const isLinked = linkedAccounts[p.url];
+                const domain = new URL(p.url).hostname;
+                const logoUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+
                 return (
                   <motion.div key={p.url} variants={item}
-                    className={cn("glass-card p-4 text-left transition-all relative group flex flex-col", isAdded ? "border-emerald-500/30 bg-emerald-500/5 shadow-lg shadow-emerald-500/5" : "hover:border-blue-500/30")}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xl">{p.icon}</span>
+                    onClick={() => isAdded && setSelectedPlatformDetail(p)}
+                    className={cn("glass-card p-4 text-left transition-all relative group flex flex-col",
+                      isAdded ? "border-emerald-500/30 bg-emerald-500/5 shadow-lg shadow-emerald-500/5 cursor-pointer hover:shadow-emerald-500/10" : "hover:border-blue-500/30 cursor-default")}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/10 overflow-hidden">
+                        <img src={logoUrl} alt={p.name} className="w-5 h-5 object-contain opacity-50 group-hover:opacity-100 transition-opacity" />
+                      </div>
                       <div className="flex items-center gap-2">
                         {isAdded && <CheckCircle className="w-4 h-4 text-emerald-400" />}
                         {isAdded && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setPlatformToLink(p); }}
-                            className={cn("p-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 transition-all", isLinked ? "text-emerald-400" : "text-muted-foreground")}
+                            className={cn("p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all", isLinked ? "text-emerald-400 border-emerald-500/20 shadow-lg shadow-emerald-500/10" : "text-muted-foreground")}
                           >
                             <Lock className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>
                     </div>
-                    <p className="text-sm font-bold">{p.name}</p>
-                    <p className="text-[10px] text-muted-foreground truncate opacity-50 mb-4">{p.url}</p>
+                    <p className="text-sm font-bold truncate pr-6">{p.name}</p>
+                    <p className="text-[10px] text-muted-foreground truncate opacity-50 mb-4">{domain}</p>
 
                     <button
-                      onClick={() => isAdded ? removePlatform(p.url) : addPlatform(p)}
-                      className={cn("w-full py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all",
-                        isAdded ? "bg-white/5 border-white/10 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400" : "bg-blue-600 border-blue-400/50 hover:bg-blue-500")}
+                      onClick={(e) => { e.stopPropagation(); isAdded ? removePlatform(p.url) : addPlatform(p); }}
+                      className={cn("w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all mt-auto",
+                        isAdded ? "bg-white/5 border-white/10 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400" : "bg-blue-600 border-blue-400/50 hover:bg-blue-500 shadow-lg shadow-blue-500/10 font-black")}
                     >
-                      {isAdded ? "Remove Base" : "Add Base"}
+                      {isAdded ? "Retire Base" : "Add Base"}
                     </button>
                   </motion.div>
                 );
